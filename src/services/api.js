@@ -1,5 +1,5 @@
 
-const API_URL = "http://localhost:5002";
+const API_URL = process.env.VITE_API_URL;
 
 
 async function request(endpoint, options = {}) {
