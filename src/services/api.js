@@ -73,6 +73,12 @@ export const invoiceService = {
       body: JSON.stringify(data),
     });
   },
+  generateIsrRetention: async (data) => {
+    return request('/api/invoices/retencion-isr', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
   stampInvoice: async (data) => {
     return request('/api/invoices/timbra', {
       method: 'POST',
@@ -94,8 +100,9 @@ export const salesService = {
       body: JSON.stringify(saleData),
     });
   },
-  getAllSales: async () => {
-    return request('/api/sales').then(response => response.data);
+  getAllSales: async (params = { limit: 50, page: 1 }) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/sales?${query}`).then(response => response.data);
   },
   getSaleById: async (id) => {
     return request(`/api/sales/${id}`);
@@ -112,5 +119,20 @@ export const salesService = {
   },
   searchSales: async (query, field = 'folio') => {
     return request(`/api/sales/search?q=${encodeURIComponent(query)}&field=${field}`);
+  },
+};
+
+export const userService = {
+  getCurrentUser: async () => {
+    return request('/api/users/me');
+  },
+  getEmisorConfig: async () => {
+    return request('/api/users/me/emisor-config');
+  },
+  updateEmisorConfig: async (config) => {
+    return request('/api/users/me/emisor-config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
   },
 };

@@ -7,6 +7,7 @@ import InvoiceList from './pages/InvoiceList';
 import ClientInvoice from './pages/ClientInvoice';
 import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
+import ApiTest from './pages/ApiTest';
 function Navbar() {
   const location = useLocation();
   const user = authService.getCurrentUser();
@@ -28,6 +29,7 @@ function Navbar() {
         <a href="/global-invoice" className={isActive('/global-invoice')}>Factura Global</a>
         <a href="/client-invoice" className={isActive('/client-invoice')}>Factura Cliente</a>
         <a href="/list-sales" className={isActive('/list-sales')}>Listar Ventas</a>
+        <a href="/api-test" className={isActive('/api-test')}>🧪 API Test</a>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <span style={{ fontSize: '0.875rem' }}>{user?.email || 'Usuario'}</span>
@@ -111,6 +113,17 @@ function App() {
               <Navbar />
               <main className="main-content">
                 <ListSales />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/api-test"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <ApiTest />
               </main>
             </ProtectedRoute>
           }

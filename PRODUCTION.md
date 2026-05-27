@@ -19,13 +19,18 @@
 
 ## Environment Variables
 
+* [ ] ggg
+* [ ] 
+
 ### Development (.env.development)
+
 ```
 VITE_API_URL=http://localhost:5002
 VITE_ENV=development
 ```
 
 ### Production (.env.production)
+
 ```
 VITE_API_URL=https://your-domain.com
 VITE_ENV=production
@@ -34,15 +39,16 @@ VITE_ENV=production
 ## Build & Deployment
 
 ### Local Build
+
 ```bash
 cd frontend
 npm install
 npm run build
 ```
 
-Output: `frontend/dist/` directory ready for serving
 
 ### Docker Build
+
 ```bash
 # Build image
 docker build -t cfdi-frontend:latest .
@@ -91,6 +97,7 @@ Frontend uses `VITE_API_URL` environment variable for backend communication.
 ### Bundle Analysis
 
 Run this to analyze bundle size:
+
 ```bash
 npm run build -- --analyze
 ```
@@ -106,6 +113,7 @@ npm run build -- --analyze
 ## Development Workflow
 
 ### Start Dev Server
+
 ```bash
 npm run dev
 ```
@@ -115,6 +123,7 @@ npm run dev
 - Proxy API requests to http://localhost:5002
 
 ### Build for Production
+
 ```bash
 npm run build
 ```
@@ -124,6 +133,7 @@ npm run build
 - Generates dist/ folder
 
 ### Preview Production Build
+
 ```bash
 npm run preview
 ```
@@ -158,24 +168,28 @@ See `nginx.conf` in project root for full configuration.
 ```
 
 ### Check for Updates
+
 ```bash
 npm outdated
 npm update
 ```
 
 ### Audit Security
+
 ```bash
 npm audit
 npm audit fix
 ```
 
 Current Issues:
+
 - 2 moderate vulnerabilities (esbuild) - from Vite dependency
 - Monitor for fixes in future Vite releases
 
 ## Troubleshooting
 
 ### Build Fails
+
 ```bash
 # Clear cache and rebuild
 rm -rf node_modules dist
@@ -184,16 +198,19 @@ npm run build
 ```
 
 ### API Calls Fail in Production
+
 - Verify `VITE_API_URL` environment variable is set
 - Check browser console for CORS errors
 - Verify nginx routing is correct
 
 ### Assets Not Loading
+
 - Check nginx static file serving
 - Verify dist/ folder exists with correct permissions
 - Check for 404 errors in nginx logs
 
 ### High Bundle Size
+
 ```bash
 # Analyze bundle
 npm run build -- --analyze
