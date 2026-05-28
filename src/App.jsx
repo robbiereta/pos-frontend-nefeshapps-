@@ -8,6 +8,7 @@ import ClientInvoice from './pages/ClientInvoice';
 import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
+import Products from './pages/Products';
 function Navbar() {
   const location = useLocation();
   const user = authService.getCurrentUser();
@@ -21,15 +22,15 @@ function Navbar() {
 
   return (
     <nav className="navbar">
-      <h1>CFDI - Facturación</h1>
+      <h1>Nefesh Pos</h1>
       <div className="nav-links">
         <a href="/dashboard" className={isActive('/dashboard')}>Dashboard</a>
         <a href="/pos" className={isActive('/pos')}>POS</a>
+        <a href="/products" className={isActive('/products')}>Productos</a>
         <a href="/invoices" className={isActive('/invoices')}>Facturas</a>
         <a href="/global-invoice" className={isActive('/global-invoice')}>Factura Global</a>
         <a href="/client-invoice" className={isActive('/client-invoice')}>Factura Cliente</a>
         <a href="/list-sales" className={isActive('/list-sales')}>Listar Ventas</a>
-        <a href="/api-test" className={isActive('/api-test')}>🧪 API Test</a>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <span style={{ fontSize: '0.875rem' }}>{user?.email || 'Usuario'}</span>
@@ -124,6 +125,17 @@ function App() {
               <Navbar />
               <main className="main-content">
                 <ApiTest />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <Products />
               </main>
             </ProtectedRoute>
           }
