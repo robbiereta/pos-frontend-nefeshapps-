@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authService } from '../services/api';
 
 export default function Login() {
@@ -59,6 +60,10 @@ export default function Login() {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
+
+        <div className="auth-footer">
+          <p>¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link></p>
+        </div>
       </div>
     </div>
   );

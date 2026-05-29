@@ -43,6 +43,18 @@ export const authService = {
     }
     return data;
   },
+  register: async (userData) => {
+    const data = await request('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+    if (data.data?.accessToken) {
+      localStorage.setItem('token', data.data.accessToken);
+      localStorage.setItem('refreshToken', data.data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+    }
+    return data;
+  },
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');

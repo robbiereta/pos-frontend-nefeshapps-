@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { authService } from './services/api';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
 import GlobalInvoice from './pages/GlobalInvoice';
 import InvoiceList from './pages/InvoiceList';
 import ClientInvoice from './pages/ClientInvoice';
@@ -31,6 +33,7 @@ function Navbar() {
         <a href="/global-invoice" className={isActive('/global-invoice')}>Factura Global</a>
         <a href="/client-invoice" className={isActive('/client-invoice')}>Factura Cliente</a>
         <a href="/list-sales" className={isActive('/list-sales')}>Listar Ventas</a>
+        <a href="/settings" className={isActive('/settings')}>Configuración</a>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <span style={{ fontSize: '0.875rem' }}>{user?.email || 'Usuario'}</span>
@@ -52,6 +55,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route
           path="/dashboard"
           element={
@@ -136,6 +140,17 @@ function App() {
               <Navbar />
               <main className="main-content">
                 <Products />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <Settings />
               </main>
             </ProtectedRoute>
           }

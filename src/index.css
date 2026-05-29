@@ -171,6 +171,50 @@ body {
   border-radius: 4px;
   margin-bottom: 1rem;
   font-size: 0.875rem;
+  border-left: 4px solid var(--danger);
+}
+
+.success-message {
+  background: #f0fdf4;
+  color: var(--success);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  border-left: 4px solid var(--success);
+}
+
+.register-card {
+  max-width: 500px;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--gray-500);
+  font-size: 0.75rem;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.auth-footer p {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+.auth-footer a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
 }
 
 .stats-grid {
