@@ -100,7 +100,7 @@ export const invoiceService = {
 
 export const productService = {
   getProducts: async () => {
-    return request('/api/productos');
+    return request('/api/products');
   },
 };
 
