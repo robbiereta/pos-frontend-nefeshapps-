@@ -48,20 +48,14 @@ const ListSales = () => {
     }
 
     try {
-      // Using a delete endpoint - adjust if needed
-      await fetch(`http://localhost:5002/api/sales/${saleId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await salesService.deleteSale(saleId);
       setSales(sales.filter(s => s._id !== saleId));
       setShowDetails(false);
       setDeleteConfirm(null);
       alert('Venta eliminada exitosamente');
     } catch (error) {
       console.error('Error deleting sale:', error);
-      alert('Error al eliminar la venta');
+      alert(error.message || 'Error al eliminar la venta');
     }
   };
 

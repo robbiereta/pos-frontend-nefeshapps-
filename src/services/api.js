@@ -131,6 +131,11 @@ export const salesService = {
   searchSales: async (query, field = 'folio') => {
     return request(`/api/sales/search?q=${encodeURIComponent(query)}&field=${field}`);
   },
+  deleteSale: async (id) => {
+    return request(`/api/sales/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const userService = {
