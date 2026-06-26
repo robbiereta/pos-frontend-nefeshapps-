@@ -428,6 +428,7 @@ const Pos = () => {
         },
         status: 'pagado',
         salesType: 'pos',
+        origin: 'admin',
         notes: 'Venta generada desde POS',
         source: 'pos-frontend'
       };
