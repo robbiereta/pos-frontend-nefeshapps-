@@ -7,6 +7,11 @@ import Settings from './pages/Settings';
 import GlobalInvoice from './pages/GlobalInvoice';
 import InvoiceList from './pages/InvoiceList';
 import ClientInvoice from './pages/ClientInvoice';
+import ClientInvoiceWorkflow from './pages/ClientInvoiceWorkflow';
+import SaleToInvoice from './pages/SaleToInvoice';
+import CashDrawer from './pages/CashDrawer';
+import CashDrawersList from './pages/CashDrawersList';
+import ClientsPage from './pages/ClientsPage';
 import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
@@ -24,20 +29,33 @@ function Navbar() {
 
   return (
     <nav className="navbar">
-      <h1>Nefesh Pos</h1>
+      <h1>🍽️ Nefesh Pos</h1>
       <div className="nav-links">
-        <a href="/dashboard" className={isActive('/dashboard')}>Dashboard</a>
-        <a href="/pos" className={isActive('/pos')}>POS</a>
-        <a href="/products" className={isActive('/products')}>Productos</a>
-        <a href="/invoices" className={isActive('/invoices')}>Facturas</a>
-        <a href="/global-invoice" className={isActive('/global-invoice')}>Factura Global</a>
-        <a href="/client-invoice" className={isActive('/client-invoice')}>Factura Cliente</a>
-        <a href="/list-sales" className={isActive('/list-sales')}>Listar Ventas</a>
-        <a href="/settings" className={isActive('/settings')}>Configuración</a>
+        {/* Operaciones */}
+        <a href="/dashboard" className={isActive('/dashboard')} title="Dashboard">📊 Dashboard</a>
+        <a href="/pos" className={isActive('/pos')} title="Punto de Venta">🛒 POS</a>
+        <a href="/products" className={isActive('/products')} title="Gestión de Productos">📦 Productos</a>
+
+        {/* Ventas y Clientes */}
+        <a href="/list-sales" className={isActive('/list-sales')} title="Historial de Ventas">💾 Ventas</a>
+        <a href="/clients" className={isActive('/clients')} title="Gestión de Clientes">👥 Clientes</a>
+
+        {/* Facturación */}
+        <a href="/sale-to-invoice" className={isActive('/sale-to-invoice')} title="Convertir Venta a Factura">📄 Timbrar</a>
+        <a href="/global-invoice" className={isActive('/global-invoice')} title="Factura Consolidada">🏢 Global</a>
+        <a href="/client-invoice" className={isActive('/client-invoice')} title="Factura por Cliente">👤 Cliente</a>
+        <a href="/invoices" className={isActive('/invoices')} title="Listado de Facturas">📋 Facturas</a>
+
+        {/* Reportes */}
+        <a href="/cash-drawer" className={isActive('/cash-drawer')} title="Crear nuevo Corte de Caja">➕ Corte</a>
+        <a href="/cash-drawers-list" className={isActive('/cash-drawers-list')} title="Historial de Cortes">📈 Cortes</a>
+
+        {/* Configuración */}
+        <a href="/settings" className={isActive('/settings')} title="Configuración del Negocio">⚙️ Config</a>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <span style={{ fontSize: '0.875rem' }}>{user?.email || 'Usuario'}</span>
-        <button onClick={handleLogout}>Cerrar Sesión</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: '0.9rem', opacity: 0.95 }}>👤 {user?.email || 'Usuario'}</span>
+        <button onClick={handleLogout}>🚪 Salir</button>
       </div>
     </nav>
   );
@@ -112,12 +130,67 @@ function App() {
           }
         />
         <Route
+          path="/client-invoice-workflow"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <ClientInvoiceWorkflow />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sale-to-invoice"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <SaleToInvoice />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/list-sales"
           element={
             <ProtectedRoute>
               <Navbar />
               <main className="main-content">
                 <ListSales />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cash-drawer"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <CashDrawer />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clients"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <ClientsPage />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cash-drawers-list"
+          element={
+            <ProtectedRoute>
+              <Navbar />
+              <main className="main-content">
+                <CashDrawersList />
               </main>
             </ProtectedRoute>
           }

@@ -1,8 +1,10 @@
 import { salesService } from '../services/api';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './ListSales.css';
 
 const ListSales = () => {
+  const navigate = useNavigate();
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -108,6 +110,7 @@ const ListSales = () => {
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Total</th>
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Estado</th>
                   <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>Fecha</th>
+                  <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #ddd' }}>Estado</th>
                   <th style={{ padding: '12px', textAlign: 'center', borderBottom: '2px solid #ddd' }}>Acciones</th>
                 </tr>
               </thead>
@@ -133,20 +136,78 @@ const ListSales = () => {
                       {sale.saleDate ? new Date(sale.saleDate).toLocaleDateString('es-MX') : 'N/A'}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleViewDetails(sale)}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#2c5aa0',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          marginRight: '8px'
-                        }}
-                      >
-                        👁️ Ver Detalles
-                      </button>
+                      <span style={{
+                        display: 'inline-block',
+                        backgroundColor: sale.status === 'facturado' ? '#10b981' : '#f59e0b',
+                        color: 'white',
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        textTransform: 'capitalize'
+                      }}>
+                        {sale.status === 'facturado' ? '✓ Timbrado' : sale.status || 'Pendiente'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      {sale.status !== 'facturado' ? (
+                        <button
+                          onClick={() => handleViewDetails(sale)}
+                          style={{
+                            padding: '8px 14px',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 1px 3px rgba(59, 130, 246, 0.3)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.backgroundColor = '#2563eb';
+                            e.target.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.4)';
+                            e.target.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.backgroundColor = '#3b82f6';
+                            e.target.style.boxShadow = '0 1px 3px rgba(59, 130, 246, 0.3)';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          → Facturar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleViewDetails(sale)}
+                          style={{
+                            padding: '8px 14px',
+                            backgroundColor: '#6b7280',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.backgroundColor = '#4b5563';
+                            e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
+                            e.target.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.backgroundColor = '#6b7280';
+                            e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          👁️ Ver Detalles
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -303,7 +364,27 @@ const ListSales = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="no-print" style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
+            <div className="no-print" style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {selectedSale.status !== 'facturado' && (
+                <button
+                  onClick={() => {
+                    closeDetails();
+                    navigate('/sale-to-invoice');
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}
+                >
+                  → Facturar Ahora
+                </button>
+              )}
               <button
                 onClick={handlePrint}
                 style={{

@@ -1,0 +1,1027 @@
+import { useState, useEffect } from 'react';
+import { salesService, invoiceService, userService } from '../services/api';
+
+export default function SaleToInvoice() {
+  const [sales, setSales] = useState([]);
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingSales, setLoadingSales] = useState(true);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  const [progress, setProgress] = useState('');
+  const [step, setStep] = useState('list');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
+
+  const fetchSales = async () => {
+    try {
+      setLoadingSales(true);
+      setError(null);
+      console.log('Fetching sales...');
+      const data = await salesService.getAllSales({ limit: 100, page: 1 });
+      console.log('Sales data received:', data);
+
+      let salesArray = [];
+      if (Array.isArray(data)) {
+        salesArray = data;
+      } else if (data && typeof data === 'object') {
+        // Si es un objeto, intentar extraer el array
+        salesArray = data.sales || data.items || Object.values(data).find(v => Array.isArray(v)) || [];
+      }
+
+      console.log('Parsed sales:', salesArray);
+      setSales(salesArray);
+    } catch (err) {
+      console.error('Error fetching sales:', err);
+      setError('Error al cargar las ventas: ' + err.message);
+      setSales([]);
+    } finally {
+      setLoadingSales(false);
+    }
+  };
+
+  const filteredSales = sales.filter(sale => {
+    const matchesSearch = !searchTerm ||
+      sale.folio?.includes(searchTerm) ||
+      sale.customer?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      sale.customer?.rfc?.includes(searchTerm);
+
+    const matchesFilter = filter === 'all' || sale.status === filter;
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const handleSelectSale = (sale) => {
+    setSelectedSale(sale);
+    setStep('preview');
+    setError(null);
+  };
+
+  const handleConvertToInvoice = async () => {
+    if (!selectedSale) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setStep('processing');
+
+    try {
+      setProgress('Construyendo factura desde la venta...');
+      const invoicePayload = {
+        notasPartidas: selectedSale.items.map(item => ({
+          pu: item.valorUnitario,
+          cantidad: item.cantidad,
+          Descripcion: item.descripcion,
+          CodigoSat: item.claveProdServ,
+          ClaveUnidad: item.claveUnidad,
+          Unidad: item.unidad
+        })),
+        receptorRfc: selectedSale.customer.rfc,
+        receptorNombre: selectedSale.customer.nombre,
+        receptorRegimen: selectedSale.customer.regimenFiscalReceptor,
+        DomicilioFiscalReceptor: selectedSale.customer.domicilioFiscalReceptor,
+        UsoCFDI: selectedSale.customer.usoCFDI,
+        folio: selectedSale.folio || '',
+        formaPago: selectedSale.formaPago,
+        MetodoPago: selectedSale.metodoPago
+      };
+
+      const invoiceData = await invoiceService.generateClient(invoicePayload);
+
+      if (!invoiceData.data) {
+        throw new Error('La factura no se generó correctamente');
+      }
+
+      setProgress('Generando PDF de la factura...');
+
+      let pdfResponse = null;
+      try {
+        pdfResponse = await invoiceService.generatePDF(JSON.stringify(invoiceData.data));
+      } catch (pdfErr) {
+        console.warn('PDF generation warning:', pdfErr.message);
+      }
+
+      setProgress('');
+      setResult({
+        sale: selectedSale,
+        invoice: invoiceData.data,
+        pdf: pdfResponse?.data,
+        stamped: null,
+        uuid: null,
+        cfdi: null,
+      });
+
+      setStep('confirm');
+    } catch (err) {
+      console.error('Conversion error:', err);
+      setError(err.message || 'Error al convertir la venta a factura');
+      setStep('error');
+    } finally {
+      setLoading(false);
+      setProgress('');
+    }
+  };
+
+  const handleConfirmStamping = async () => {
+    if (!result?.invoice) return;
+
+    setLoading(true);
+    setError(null);
+    setStep('processing');
+
+    try {
+      setProgress('Obteniendo configuración SW.com.mx...');
+
+      const emisorConfig = await userService.getEmisorConfig();
+      const swToken = emisorConfig.data?.emisorConfig?.sw_config?.tokenProd;
+      const swEmail = emisorConfig.data?.emisorConfig?.sw_config?.email ||
+                      emisorConfig.data?.emisorConfig?.emailFacturacion;
+
+      if (!swToken) {
+        throw new Error('No se encontró token SW.com.mx en la configuración. Verifica la configuración de emisor.');
+      }
+
+      setProgress('Timbrando factura con SW.com.mx...');
+
+      const stampPayload = {
+        invoiceData: result.invoice,
+        token: swToken,
+        email: swEmail
+      };
+
+      const stampedResponse = await invoiceService.stampInvoice(stampPayload);
+
+      setProgress('Generando PDF del CFDI timbrado...');
+
+      const cfdiXml = stampedResponse.data?.data?.cfdi;
+      let stampedPdfResponse = null;
+
+      if (cfdiXml) {
+        try {
+          stampedPdfResponse = await invoiceService.generatePDF(cfdiXml);
+        } catch (pdfErr) {
+          console.warn('PDF generation failed, but invoice was stamped:', pdfErr.message);
+        }
+      }
+
+      setProgress('');
+      setResult(prev => ({
+        ...prev,
+        stamped: stampedResponse.data,
+        uuid: stampedResponse.data?.data?.uuid || stampedResponse.data?.uuid,
+        cfdi: stampedResponse.data?.data?.cfdi,
+        pdf: stampedPdfResponse?.data || prev.pdf,
+      }));
+
+      setStep('success');
+      fetchSales();
+    } catch (err) {
+      console.error('Stamping error:', err);
+      setError(err.message || 'Error al timbrar la factura');
+      setStep('error');
+    } finally {
+      setLoading(false);
+      setProgress('');
+    }
+  };
+
+  // LIST VIEW
+  if (step === 'list') {
+    return (
+      <>
+        <h2 style={{ marginBottom: '1.5rem' }}>Convertir Ventas a Facturas</h2>
+
+        <div className="card">
+          <h3 style={{ marginBottom: '0.5rem' }}>Selecciona una venta para facturar</h3>
+          <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>
+            Elige una venta de tu historial y genera automáticamente una factura CFDI timbrada.
+          </p>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '1rem',
+            marginBottom: '1.5rem'
+          }}>
+            <div className="form-group">
+              <label htmlFor="searchTerm">Buscar (Folio, RFC, Nombre)</label>
+              <input
+                id="searchTerm"
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar venta..."
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="filter">Filtrar por estado</label>
+              <select
+                id="filter"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                <option value="all">Todas las ventas</option>
+                <option value="pendiente de facturar">Pendiente de facturar</option>
+                <option value="facturado">Facturado</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button
+                onClick={fetchSales}
+                style={{
+                  width: '100%',
+                  backgroundColor: 'var(--gray-600)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          {loadingSales ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <p>Cargando ventas...</p>
+            </div>
+          ) : filteredSales.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '2rem',
+              backgroundColor: 'var(--gray-50)',
+              borderRadius: '4px',
+              color: 'var(--gray-600)'
+            }}>
+              {searchTerm || filter !== 'all' ? (
+                <p>No se encontraron ventas con los filtros aplicados</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>No hay ventas registradas</p>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>Para convertir ventas a facturas, primero debes crear ventas en la sección POS.</p>
+                  <a
+                    href="/pos"
+                    style={{
+                      backgroundColor: 'var(--primary-color)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      display: 'inline-block'
+                    }}
+                  >
+                    Ir a POS para crear ventas
+                  </a>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                marginBottom: '1rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Folio</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Cliente</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>RFC</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Items</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSales.map((sale, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-200)', backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
+                      <td style={{ padding: '0.75rem' }}>{sale.folio || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem' }}>{sale.customer?.nombre || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem' }}>{sale.customer?.rfc || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        ${(sale.total || 0).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        {sale.items?.length || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          backgroundColor: sale.status === 'facturado'
+                            ? '#10b981'
+                            : sale.status === 'pendiente de facturar'
+                            ? '#f59e0b'
+                            : '#6b7280',
+                          color: 'white',
+                          padding: '0.35rem 0.85rem',
+                          borderRadius: '20px',
+                          fontSize: '0.8rem',
+                          fontWeight: '500',
+                          textTransform: 'capitalize',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}>
+                          {sale.status === 'facturado' ? '✓ Timbrado' : '⏳ Pendiente'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleSelectSale(sale)}
+                          disabled={sale.status === 'facturado'}
+                          style={{
+                            backgroundColor: sale.status === 'facturado'
+                              ? '#e5e7eb'
+                              : '#3b82f6',
+                            color: sale.status === 'facturado' ? '#9ca3af' : 'white',
+                            border: 'none',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '6px',
+                            cursor: sale.status === 'facturado' ? 'not-allowed' : 'pointer',
+                            fontSize: '0.85rem',
+                            fontWeight: '500',
+                            transition: 'all 0.2s',
+                            boxShadow: sale.status === 'facturado' ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
+                            opacity: sale.status === 'facturado' ? 0.6 : 1
+                          }}
+                          onMouseOver={(e) => {
+                            if (sale.status !== 'facturado') {
+                              e.target.style.backgroundColor = '#2563eb';
+                              e.target.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.backgroundColor = '#3b82f6';
+                            e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                            e.target.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          {sale.status === 'facturado' ? '✓ Timbrado' : '→ Facturar'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // PREVIEW VIEW
+  if (step === 'preview') {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => {
+              setStep('list');
+              setSelectedSale(null);
+            }}
+            style={{
+              backgroundColor: 'var(--gray-500)',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ← Volver a lista
+          </button>
+        </div>
+
+        <div className="card">
+          <h2 style={{ marginBottom: '1.5rem' }}>Vista previa de factura</h2>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--gray-50)'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Datos de la Venta</h3>
+              <p><strong>ID:</strong> {selectedSale.id}</p>
+              <p><strong>Folio:</strong> {selectedSale.folio || 'N/A'}</p>
+              <p><strong>Fecha:</strong> {new Date(selectedSale.saleDate).toLocaleDateString()}</p>
+              <p><strong>Estado:</strong> {selectedSale.status}</p>
+              <p><strong>Total:</strong> ${selectedSale.total?.toFixed(2)}</p>
+            </div>
+
+            <div style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--gray-50)'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Datos del Cliente</h3>
+              <p><strong>Nombre:</strong> {selectedSale.customer?.nombre}</p>
+              <p><strong>RFC:</strong> {selectedSale.customer?.rfc}</p>
+              <p><strong>Régimen:</strong> {selectedSale.customer?.regimenFiscalReceptor}</p>
+              <p><strong>Código Postal:</strong> {selectedSale.customer?.domicilioFiscalReceptor}</p>
+              <p><strong>Uso CFDI:</strong> {selectedSale.customer?.usoCFDI}</p>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Conceptos ({selectedSale.items?.length || 0})</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                backgroundColor: 'white',
+                border: '1px solid var(--gray-200)'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--gray-100)' }}>
+                    <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--gray-300)' }}>Descripción</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid var(--gray-300)' }}>Cantidad</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid var(--gray-300)' }}>Precio</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid var(--gray-300)' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSale.items?.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-200)' }}>
+                      <td style={{ padding: '0.5rem' }}>{item.descripcion}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.cantidad}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>${item.valorUnitario?.toFixed(2)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        ${(item.cantidad * item.valorUnitario)?.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={{
+            border: '1px solid var(--gray-200)',
+            borderRadius: '4px',
+            padding: '1rem',
+            marginBottom: '2rem',
+            backgroundColor: 'var(--gray-50)'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div>
+                <span style={{ color: 'var(--gray-600)' }}>Subtotal:</span>
+                <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  ${(selectedSale.total / 1.16)?.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <span style={{ color: 'var(--gray-600)' }}>IVA (16%):</span>
+                <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                  ${(selectedSale.total - (selectedSale.total / 1.16))?.toFixed(2)}
+                </div>
+              </div>
+              <div>
+                <span style={{ color: 'var(--gray-600)' }}>Total:</span>
+                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                  ${selectedSale.total?.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <button
+              onClick={() => {
+                setStep('list');
+                setSelectedSale(null);
+              }}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                padding: '0.85rem 1.75rem',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: '500',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#4b5563';
+                e.target.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)';
+                e.target.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#6b7280';
+                e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConvertToInvoice}
+              disabled={loading}
+              style={{
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                padding: '0.85rem 1.75rem',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)',
+                opacity: loading ? 0.7 : 1,
+                transform: loading ? 'scale(0.98)' : 'scale(1)'
+              }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#2563eb';
+                  e.target.style.boxShadow = '0 6px 12px rgba(59, 130, 246, 0.4)';
+                  e.target.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#3b82f6';
+                e.target.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.3)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite'
+                  }} />
+                  Procesando...
+                </span>
+              ) : (
+                '✓ Generar y Timbrar Factura'
+              )}
+            </button>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CONFIRM VIEW
+  if (step === 'confirm') {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => {
+              setStep('preview');
+              setResult(null);
+            }}
+            style={{
+              backgroundColor: 'var(--gray-500)',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ← Volver a lista
+          </button>
+        </div>
+
+        <div className="card">
+          <h2 style={{ marginBottom: '1.5rem' }}>Confirmar Timbrado de Factura</h2>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <div style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffc107',
+            color: '#856404',
+            padding: '1rem',
+            borderRadius: '4px',
+            marginBottom: '1.5rem'
+          }}>
+            <strong>⚠️ Importante:</strong> Una vez timbrada la factura no podrá ser modificada y tendrá un costo asociado a través de SW.com.mx.
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--gray-50)'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Resumen de Factura</h3>
+              <p><strong>Cliente:</strong> {result.invoice?.Receptor?.Nombre}</p>
+              <p><strong>RFC:</strong> {result.invoice?.Receptor?.Rfc}</p>
+              <p><strong>Total:</strong> ${result.invoice?.Total?.toFixed(2)}</p>
+              <p><strong>Conceptos:</strong> {result.invoice?.Conceptos?.length || 0}</p>
+              <p><strong>Forma de Pago:</strong> {result.invoice?.FormaPago}</p>
+              <p><strong>Método de Pago:</strong> {result.invoice?.MetodoPago}</p>
+            </div>
+
+            <div style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--gray-50)',
+              textAlign: 'center'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Vista Previa PDF</h3>
+              {result.pdf ? (
+                <div>
+                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📄</div>
+                  <p style={{ color: 'var(--gray-600)', marginBottom: '1rem' }}>PDF generado correctamente</p>
+                  <a
+                    href={result.pdf}
+                    download={`CFDI-preview-${Date.now()}.pdf`}
+                    style={{
+                      backgroundColor: 'var(--primary-color)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      display: 'inline-block'
+                    }}
+                  >
+                    Descargar vista previa
+                  </a>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
+                  <p style={{ color: 'var(--gray-500)' }}>No se pudo generar PDF</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Conceptos</h3>
+            <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                backgroundColor: 'white',
+                border: '1px solid var(--gray-200)'
+              }}>
+                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--gray-100)' }}>
+                  <tr>
+                    <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid var(--gray-300)' }}>Descripción</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid var(--gray-300)' }}>Cantidad</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid var(--gray-300)' }}>Precio</th>
+                    <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid var(--gray-300)' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.invoice?.Conceptos?.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-200)' }}>
+                      <td style={{ padding: '0.5rem' }}>{item.Descripcion}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.Cantidad}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>${item.ValorUnitario?.toFixed(2)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        ${item.Importe?.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <button
+              onClick={() => {
+                setStep('preview');
+                setResult(null);
+              }}
+              disabled={loading}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                padding: '0.85rem 1.75rem',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                fontWeight: '500',
+                transition: 'all 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                opacity: loading ? 0.6 : 1
+              }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#4b5563';
+                  e.target.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)';
+                  e.target.style.transform = 'translateY(-1px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#6b7280';
+                e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirmStamping}
+              disabled={loading}
+              style={{
+                backgroundColor: '#dc2626',
+                color: 'white',
+                border: 'none',
+                padding: '0.85rem 1.75rem',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+                boxShadow: '0 4px 6px rgba(220, 38, 38, 0.3)',
+                opacity: loading ? 0.7 : 1,
+                transform: loading ? 'scale(0.98)' : 'scale(1)'
+              }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = '#b91c1c';
+                  e.target.style.boxShadow = '0 6px 12px rgba(220, 38, 38, 0.4)';
+                  e.target.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#dc2626';
+                e.target.style.boxShadow = '0 4px 6px rgba(220, 38, 38, 0.3)';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite'
+                  }} />
+                  Timbrando...
+                </span>
+              ) : (
+                '🔒 Confirmar Timbrado'
+              )}
+            </button>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PROCESSING VIEW
+  if (step === 'processing') {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div style={{
+          maxWidth: '600px',
+          margin: '0 auto',
+          textAlign: 'center',
+          padding: '2rem',
+          border: '1px solid var(--gray-200)',
+          borderRadius: '8px',
+          backgroundColor: 'var(--gray-50)'
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <h2>Procesando...</h2>
+          {progress && (
+            <p style={{ color: 'var(--primary-color)', marginTop: '1rem', fontSize: '1.05rem' }}>
+              {progress}
+            </p>
+          )}
+          <div style={{ marginTop: '2rem' }}>
+            <div style={{
+              display: 'inline-block',
+              width: '40px',
+              height: '40px',
+              border: '4px solid var(--gray-300)',
+              borderTop: '4px solid var(--primary-color)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }} />
+          </div>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  // SUCCESS VIEW
+  if (step === 'success') {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            onClick={() => {
+              setStep('list');
+              setSelectedSale(null);
+              setResult(null);
+            }}
+            style={{
+              backgroundColor: 'var(--gray-500)',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ← Volver al listado
+          </button>
+        </div>
+
+        <div className="card">
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>✓</div>
+            <h2>¡Factura Timbrada Exitosamente!</h2>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--gray-50)'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Datos de la Venta</h3>
+              <p><strong>ID Venta:</strong> {result.sale?.id}</p>
+              <p><strong>Folio:</strong> {result.sale?.folio || 'N/A'}</p>
+              <p><strong>Cliente:</strong> {result.sale?.customer?.nombre}</p>
+              <p><strong>RFC:</strong> {result.sale?.customer?.rfc}</p>
+              <p><strong>Total:</strong> ${result.sale?.total?.toFixed(2) || 'N/A'}</p>
+            </div>
+
+            <div style={{
+              border: '1px solid var(--primary-color)',
+              borderRadius: '4px',
+              padding: '1rem',
+              backgroundColor: 'var(--primary-color)',
+              color: 'white'
+            }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Datos del CFDI Timbrado</h3>
+              <p><strong>UUID:</strong> {result.uuid}</p>
+              <p><strong>Estado:</strong> Timbrado</p>
+              <p><strong>Total:</strong> ${result.invoice?.Total?.toFixed(2)}</p>
+              <p><strong>Conceptos:</strong> {result.invoice?.Conceptos?.length}</p>
+            </div>
+          </div>
+
+          {result.cfdi && (
+            <div style={{ marginTop: '2rem' }}>
+              <h3 style={{ marginBottom: '1rem' }}>XML del CFDI Timbrado</h3>
+              <textarea
+                readOnly
+                value={result.cfdi}
+                style={{
+                  width: '100%',
+                  height: '100px',
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  padding: '1rem',
+                  border: '1px solid var(--gray-300)',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--gray-900)',
+                  color: '#00ff00',
+                  overflow: 'auto'
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <button
+              onClick={() => {
+                setStep('list');
+                setSelectedSale(null);
+                setResult(null);
+              }}
+              style={{
+                backgroundColor: 'var(--primary-color)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              Facturar otra venta
+            </button>
+            {result.pdf && (
+              <a
+                href={result.pdf}
+                download={`CFDI-${result.uuid}.pdf`}
+                style={{
+                  backgroundColor: 'var(--success-color)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  textAlign: 'center'
+                }}
+              >
+                📄 Descargar PDF
+              </a>
+            )}
+            <button
+              onClick={() => window.print()}
+              style={{
+                backgroundColor: 'var(--gray-600)',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              Imprimir
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ERROR VIEW
+  return (
+    <div style={{ padding: '2rem' }}>
+      <div className="card">
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '0.5rem', color: 'var(--error-color)' }}>✗</div>
+          <h2>Error en el Proceso</h2>
+        </div>
+
+        {error && (
+          <div className="error-message" style={{ marginBottom: '1.5rem' }}>
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setStep('list');
+            setError(null);
+            setSelectedSale(null);
+            setResult(null);
+          }}
+          style={{
+            backgroundColor: 'var(--primary-color)',
+            color: 'white',
+            border: 'none',
+            padding: '0.75rem 1.5rem',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          Intentar de nuevo
+        </button>
+      </div>
+    </div>
+  );
+}

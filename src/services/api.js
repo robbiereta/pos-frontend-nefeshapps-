@@ -96,6 +96,12 @@ export const invoiceService = {
       body: JSON.stringify(data),
     });
   },
+  generatePDF: async (cfdiXml) => {
+    return request('/api/invoices/pdf', {
+      method: 'POST',
+      body: JSON.stringify({ cfdi: cfdiXml }),
+    });
+  },
 };
 
 export const productService = {
@@ -149,6 +155,57 @@ export const userService = {
     return request('/api/users/me/emisor-config', {
       method: 'PUT',
       body: JSON.stringify(config),
+    });
+  },
+};
+
+export const cashDrawerService = {
+  saveCutoff: async (cutoffData) => {
+    return request('/api/cash-drawer', {
+      method: 'POST',
+      body: JSON.stringify(cutoffData),
+    });
+  },
+  getCutoffs: async (params = { limit: 50, page: 1 }) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/cash-drawer?${query}`);
+  },
+  getCutoffById: async (id) => {
+    return request(`/api/cash-drawer/${id}`);
+  },
+  deleteCutoff: async (id) => {
+    return request(`/api/cash-drawer/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+export const clientService = {
+  createClient: async (clientData) => {
+    return request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData),
+    });
+  },
+  getAllClients: async (params = { limit: 50, page: 1 }) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/clients?${query}`);
+  },
+  getClientById: async (id) => {
+    return request(`/api/clients/${id}`);
+  },
+  getClientByRfc: async (rfc) => {
+    return request(`/api/clients/search-rfc?rfc=${encodeURIComponent(rfc)}`);
+  },
+  updateClient: async (id, clientData) => {
+    return request(`/api/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData),
+    });
+  },
+  deleteClient: async (id) => {
+    return request(`/api/clients/${id}`, {
+      method: 'DELETE',
     });
   },
 };
