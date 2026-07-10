@@ -16,10 +16,15 @@ const ListSales = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await salesService.getAllSales();
-      setSales(response.sales || []);
+      console.log('📋 Fetching sales...');
+      const salesData = await salesService.getAllSales();
+      console.log('📋 Sales data received:', JSON.stringify(salesData, null, 2));
+      console.log('📋 Sales data type:', typeof salesData);
+      console.log('📋 Is array:', Array.isArray(salesData));
+      console.log('📋 Sales length:', Array.isArray(salesData) ? salesData.length : 'not an array');
+      setSales(Array.isArray(salesData) ? salesData : []);
     } catch (error) {
-      console.error('Error fetching sales:', error);
+      console.error('❌ Error fetching sales:', error);
       setError(error.message || 'Error loading sales');
     } finally {
       setLoading(false);
@@ -66,6 +71,7 @@ const ListSales = () => {
     setSelectedSale(null);
     setDeleteConfirm(null);
   };
+
 
   if (loading) {
     return (
@@ -152,60 +158,81 @@ const ListSales = () => {
                     </td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       {sale.status !== 'facturado' ? (
-                        <button
-                          onClick={() => handleViewDetails(sale)}
-                          style={{
-                            padding: '8px 14px',
-                            backgroundColor: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                            fontWeight: '500',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 1px 3px rgba(59, 130, 246, 0.3)'
-                          }}
-                          onMouseOver={(e) => {
-                            e.target.style.backgroundColor = '#2563eb';
-                            e.target.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.4)';
-                            e.target.style.transform = 'translateY(-1px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.target.style.backgroundColor = '#3b82f6';
-                            e.target.style.boxShadow = '0 1px 3px rgba(59, 130, 246, 0.3)';
-                            e.target.style.transform = 'translateY(0)';
-                          }}
-                        >
-                          → Facturar
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleViewDetails(sale)}
+                            style={{
+                              padding: '5px 8px',
+                              backgroundColor: '#6b7280',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#4b5563'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = '#6b7280'}
+                            title="Ver detalles"
+                          >
+                            👁️
+                          </button>
+                          <button
+                            onClick={() => navigate('/sale-to-invoice', { state: { selectedSale: sale } })}
+                            style={{
+                              padding: '5px 8px',
+                              backgroundColor: '#10b981',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
+                            title="Facturar directamente"
+                          >
+                            🚀
+                          </button>
+                          <button
+                            onClick={() => handleDelete(sale._id)}
+                            style={{
+                              padding: '5px 8px',
+                              backgroundColor: '#ef4444',
+                              color: 'whi te',
+                              border: 'none',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+                            title="Eliminar venta"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleViewDetails(sale)}
                           style={{
-                            padding: '8px 14px',
-                            backgroundColor: '#6b7280',
+                            padding: '5px 10px',
+                            backgroundColor: '#9ca3af',
                             color: 'white',
                             border: 'none',
-                            borderRadius: '4px',
+                            borderRadius: '3px',
                             cursor: 'pointer',
-                            fontSize: '0.85rem',
-                            fontWeight: '500',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+                            fontSize: '0.75rem',
+                            transition: 'all 0.2s'
                           }}
-                          onMouseOver={(e) => {
-                            e.target.style.backgroundColor = '#4b5563';
-                            e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.15)';
-                            e.target.style.transform = 'translateY(-1px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.target.style.backgroundColor = '#6b7280';
-                            e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
-                            e.target.style.transform = 'translateY(0)';
-                          }}
+                          onMouseOver={(e) => e.target.style.backgroundColor = '#6b7280'}
+                          onMouseOut={(e) => e.target.style.backgroundColor = '#9ca3af'}
+                          title="Ver detalles"
                         >
-                          👁️ Ver Detalles
+                          👁️
                         </button>
                       )}
                     </td>

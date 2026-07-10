@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { salesService, invoiceService, userService } from '../services/api';
 
 export default function SaleToInvoice() {
+  const location = useLocation();
+  const saleFromLocation = location.state?.selectedSale;
   const [sales, setSales] = useState([]);
   const [selectedSale, setSelectedSale] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -12,9 +15,15 @@ export default function SaleToInvoice() {
   const [step, setStep] = useState('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
 
   useEffect(() => {
     fetchSales();
+    // Si la venta viene del router, preseleccionarla e ir al preview
+    if (saleFromLocation) {
+      setSelectedSale(saleFromLocation);
+      setStep('preview');
+    }
   }, []);
 
   const fetchSales = async () => {
@@ -92,24 +101,76 @@ export default function SaleToInvoice() {
 
       const invoiceData = await invoiceService.generateClient(invoicePayload);
 
+      console.log('📄 Invoice response from API:', JSON.stringify(invoiceData, null, 2));
+      console.log('💾 Invoice data object:', invoiceData?.data);
+      console.log('💰 Total value:', invoiceData?.data?.Total);
+      console.log('💰 Total type:', typeof invoiceData?.data?.Total);
+
       if (!invoiceData.data) {
         throw new Error('La factura no se generó correctamente');
       }
 
+      // Generate PDF from JSON invoice data
+      let pdfUrl = null;
       setProgress('Generando PDF de la factura...');
-
-      let pdfResponse = null;
       try {
-        pdfResponse = await invoiceService.generatePDF(JSON.stringify(invoiceData.data));
-      } catch (pdfErr) {
-        console.warn('PDF generation warning:', pdfErr.message);
-      }
+        console.group('📄 PDF Generation from JSON');
+        console.log('🔄 Starting PDF generation...');
+        console.log('📋 Invoice Data to PDF:', {
+          Folio: invoiceData.data?.Folio,
+          Fecha: invoiceData.data?.Fecha,
+          Total: invoiceData.data?.Total,
+          SubTotal: invoiceData.data?.SubTotal,
+          Emisor: invoiceData.data?.Emisor?.Nombre,
+          Receptor: invoiceData.data?.Receptor?.Nombre,
+          ConceptosCount: invoiceData.data?.Conceptos?.length
+        });
+        console.log('📦 Full JSON Payload:', JSON.stringify(invoiceData.data, null, 2));
 
+        // Send JSON invoice data directly to PDF endpoint
+        const pdfPayload = JSON.stringify({
+          invoiceJson: invoiceData.data,
+          metadata: {
+            source: 'SaleToInvoice',
+            timestamp: new Date().toISOString()
+          }
+        });
+
+        console.log('🚀 Sending PDF request with JSON payload...');
+        console.log('📤 Payload size:', pdfPayload.length, 'bytes');
+        pdfUrl = await invoiceService.generatePDF(pdfPayload);
+
+        console.log('✅ PDF generated successfully');
+        console.log('🔗 PDF URL:', pdfUrl);
+        console.log('📏 PDF URL length:', pdfUrl?.length);
+        console.log('🔍 PDF URL type:', typeof pdfUrl);
+
+        if (!pdfUrl) {
+          console.warn('⚠️  PDF URL is empty!');
+        }
+
+        console.groupEnd();
+      } catch (pdfErr) {
+        console.error('❌ PDF generation error:', {
+          message: pdfErr.message,
+          stack: pdfErr.stack,
+          invoiceDataKeys: Object.keys(invoiceData.data || {})
+        });
+        console.warn('⚠️  PDF generation warning:', pdfErr.message);
+        console.groupEnd();
+      }
       setProgress('');
+      console.log('📊 Final Result State:', {
+        hasPdfUrl: !!pdfUrl,
+        pdfUrl: pdfUrl?.substring(0, 100),
+        invoiceFolio: invoiceData.data?.Folio,
+        invoiceTotal: invoiceData.data?.Total
+      });
       setResult({
         sale: selectedSale,
         invoice: invoiceData.data,
-        pdf: pdfResponse?.data,
+        pdfUrl: pdfUrl,
+        pdfError: pdfUrl ? null : 'PDF generation failed - check console logs',
         stamped: null,
         uuid: null,
         cfdi: null,
@@ -189,195 +250,45 @@ export default function SaleToInvoice() {
     }
   };
 
-  // LIST VIEW
-  if (step === 'list') {
+  // PDF PREVIEW MODAL (rendered as overlay on top of any step)
+  if (showInvoicePrint && result?.pdfUrl) {
     return (
-      <>
-        <h2 style={{ marginBottom: '1.5rem' }}>Convertir Ventas a Facturas</h2>
-
-        <div className="card">
-          <h3 style={{ marginBottom: '0.5rem' }}>Selecciona una venta para facturar</h3>
-          <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>
-            Elige una venta de tu historial y genera automáticamente una factura CFDI timbrada.
-          </p>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <div className="form-group">
-              <label htmlFor="searchTerm">Buscar (Folio, RFC, Nombre)</label>
-              <input
-                id="searchTerm"
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar venta..."
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="filter">Filtrar por estado</label>
-              <select
-                id="filter"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              >
-                <option value="all">Todas las ventas</option>
-                <option value="pendiente de facturar">Pendiente de facturar</option>
-                <option value="facturado">Facturado</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button
-                onClick={fetchSales}
-                style={{
-                  width: '100%',
-                  backgroundColor: 'var(--gray-600)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Actualizar
-              </button>
-            </div>
-          </div>
-
-          {loadingSales ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <p>Cargando ventas...</p>
-            </div>
-          ) : filteredSales.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '2rem',
-              backgroundColor: 'var(--gray-50)',
-              borderRadius: '4px',
-              color: 'var(--gray-600)'
-            }}>
-              {searchTerm || filter !== 'all' ? (
-                <p>No se encontraron ventas con los filtros aplicados</p>
-              ) : (
-                <>
-                  <p style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>No hay ventas registradas</p>
-                  <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>Para convertir ventas a facturas, primero debes crear ventas en la sección POS.</p>
-                  <a
-                    href="/pos"
-                    style={{
-                      backgroundColor: 'var(--primary-color)',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      display: 'inline-block'
-                    }}
-                  >
-                    Ir a POS para crear ventas
-                  </a>
-                </>
-              )}
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                marginBottom: '1rem'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Folio</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Cliente</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>RFC</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Items</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSales.map((sale, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--gray-200)', backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
-                      <td style={{ padding: '0.75rem' }}>{sale.folio || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem' }}>{sale.customer?.nombre || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem' }}>{sale.customer?.rfc || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
-                        ${(sale.total || 0).toFixed(2)}
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        {sale.items?.length || 0}
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <span style={{
-                          display: 'inline-block',
-                          backgroundColor: sale.status === 'facturado'
-                            ? '#10b981'
-                            : sale.status === 'pendiente de facturar'
-                            ? '#f59e0b'
-                            : '#6b7280',
-                          color: 'white',
-                          padding: '0.35rem 0.85rem',
-                          borderRadius: '20px',
-                          fontSize: '0.8rem',
-                          fontWeight: '500',
-                          textTransform: 'capitalize',
-                          whiteSpace: 'nowrap',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                        }}>
-                          {sale.status === 'facturado' ? '✓ Timbrado' : '⏳ Pendiente'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleSelectSale(sale)}
-                          disabled={sale.status === 'facturado'}
-                          style={{
-                            backgroundColor: sale.status === 'facturado'
-                              ? '#e5e7eb'
-                              : '#3b82f6',
-                            color: sale.status === 'facturado' ? '#9ca3af' : 'white',
-                            border: 'none',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '6px',
-                            cursor: sale.status === 'facturado' ? 'not-allowed' : 'pointer',
-                            fontSize: '0.85rem',
-                            fontWeight: '500',
-                            transition: 'all 0.2s',
-                            boxShadow: sale.status === 'facturado' ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
-                            opacity: sale.status === 'facturado' ? 0.6 : 1
-                          }}
-                          onMouseOver={(e) => {
-                            if (sale.status !== 'facturado') {
-                              e.target.style.backgroundColor = '#2563eb';
-                              e.target.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)';
-                              e.target.style.transform = 'translateY(-1px)';
-                            }
-                          }}
-                          onMouseOut={(e) => {
-                            e.target.style.backgroundColor = '#3b82f6';
-                            e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                            e.target.style.transform = 'translateY(0)';
-                          }}
-                        >
-                          {sale.status === 'facturado' ? '✓ Timbrado' : '→ Facturar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: '#1e293b',
+        zIndex: 2000
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0.75rem 1rem',
+          backgroundColor: '#0f172a',
+          color: 'white',
+          borderBottom: '2px solid #334155'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>Vista Previa - Folio {result.invoice?.Folio || ''}</h3>
+          <button
+            onClick={() => setShowInvoicePrint(false)}
+            style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '0.5rem 1.25rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}
+          >
+            ✕ Cerrar
+          </button>
         </div>
-      </>
+        <iframe
+          src={result.pdfUrl}
+          style={{ width: '100%', height: 'calc(100vh - 52px)', border: 'none', backgroundColor: '#fff' }}
+          title="PDF Preview"
+        />
+      </div>
     );
   }
+
+
 
   // PREVIEW VIEW
   if (step === 'preview') {
@@ -636,7 +547,7 @@ export default function SaleToInvoice() {
               <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Resumen de Factura</h3>
               <p><strong>Cliente:</strong> {result.invoice?.Receptor?.Nombre}</p>
               <p><strong>RFC:</strong> {result.invoice?.Receptor?.Rfc}</p>
-              <p><strong>Total:</strong> ${result.invoice?.Total?.toFixed(2)}</p>
+              <p><strong>Total:</strong> ${parseFloat(result.invoice?.Total || 0).toFixed(2)}</p>
               <p><strong>Conceptos:</strong> {result.invoice?.Conceptos?.length || 0}</p>
               <p><strong>Forma de Pago:</strong> {result.invoice?.FormaPago}</p>
               <p><strong>Método de Pago:</strong> {result.invoice?.MetodoPago}</p>
@@ -649,32 +560,39 @@ export default function SaleToInvoice() {
               backgroundColor: 'var(--gray-50)',
               textAlign: 'center'
             }}>
-              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Vista Previa PDF</h3>
-              {result.pdf ? (
-                <div>
-                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>📄</div>
-                  <p style={{ color: 'var(--gray-600)', marginBottom: '1rem' }}>PDF generado correctamente</p>
-                  <a
-                    href={result.pdf}
-                    download={`CFDI-preview-${Date.now()}.pdf`}
-                    style={{
-                      backgroundColor: 'var(--primary-color)',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      textDecoration: 'none',
-                      display: 'inline-block'
-                    }}
-                  >
-                    Descargar vista previa
-                  </a>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: '3rem', marginBottom: '0.5rem', opacity: 0.5 }}>📄</div>
-                  <p style={{ color: 'var(--gray-500)' }}>No se pudo generar PDF</p>
-                </div>
-              )}
+              <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Acciones</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  🖨️ Imprimir / Descargar
+                </button>
+                <button
+                  onClick={() => setShowInvoicePrint(true)}
+                  style={{
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  👁️ Vista Previa
+                </button>
+              </div>
             </div>
           </div>
 
@@ -700,9 +618,9 @@ export default function SaleToInvoice() {
                     <tr key={idx} style={{ borderBottom: '1px solid var(--gray-200)' }}>
                       <td style={{ padding: '0.5rem' }}>{item.Descripcion}</td>
                       <td style={{ padding: '0.5rem', textAlign: 'center' }}>{item.Cantidad}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>${item.ValorUnitario?.toFixed(2)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>${parseFloat(item.ValorUnitario || 0).toFixed(2)}</td>
                       <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }}>
-                        ${item.Importe?.toFixed(2)}
+                        ${parseFloat(item.Importe || 0).toFixed(2)}
                       </td>
                     </tr>
                   ))}

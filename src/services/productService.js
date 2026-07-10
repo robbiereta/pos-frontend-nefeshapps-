@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
 
 async function request(endpoint, options = {}, retries = 3, delay = 1000) {
   const token = localStorage.getItem('token');
@@ -30,9 +30,17 @@ async function request(endpoint, options = {}, retries = 3, delay = 1000) {
         continue;
       }
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Expected JSON but got ${contentType || 'text'}: ${text.substring(0, 100)}`);
+      }
+
       if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
+        throw new Error(data.message || `Request failed with status ${response.status}`);
       }
       return data;
     } catch (error) {

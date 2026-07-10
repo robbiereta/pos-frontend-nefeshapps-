@@ -23,9 +23,17 @@ async function request(endpoint, options = {}) {
     throw new Error('Unauthorized');
   }
 
-  const data = await response.json();
+  let data;
+  const contentType = response.headers.get('content-type');
+  if (contentType?.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    throw new Error(`Expected JSON but got ${contentType || 'text'}: ${text.substring(0, 100)}`);
+  }
+
   if (!response.ok) {
-    throw new Error(data.message || 'Request failed');
+    throw new Error(data.message || `Request failed with status ${response.status}`);
   }
   return data;
 }
@@ -102,10 +110,54 @@ export const invoiceService = {
       body: JSON.stringify(data),
     });
   },
-  generatePDF: async (cfdiXml) => {
-    return request('/api/invoices/pdf', {
+  generatePDF: async (invoiceJsonOrXmlOrUuid) => {
+    const token = localStorage.getItem('token');
+
+    let payload;
+
+    if (typeof invoiceJsonOrXmlOrUuid === 'string') {
+      if (invoiceJsonOrXmlOrUuid.includes('<')) {
+        // XML string
+        payload = { cfdi: invoiceJsonOrXmlOrUuid };
+      } else if (invoiceJsonOrXmlOrUuid.includes('{')) {
+        // JSON string
+        try {
+          payload = JSON.parse(invoiceJsonOrXmlOrUuid);
+          // If it has invoiceJson key, extract it
+          if (payload.invoiceJson) {
+            payload = { invoiceJson: payload.invoiceJson };
+          }
+        } catch (e) {
+          // Assume it's a UUID if not valid JSON
+          payload = { uuid: invoiceJsonOrXmlOrUuid };
+        }
+      } else {
+        // UUID
+        payload = { uuid: invoiceJsonOrXmlOrUuid };
+      }
+    } else {
+      // Object - assume it's invoice JSON
+      payload = { invoiceJson: invoiceJsonOrXmlOrUuid };
+    }
+
+    console.log('📤 PDF Request Payload:', payload);
+
+    return fetch(`${API_URL}/api/invoices/pdf`, {
       method: 'POST',
-      body: JSON.stringify({ cfdi: cfdiXml }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    }).then(response => {
+      console.log('📥 PDF Response Status:', response.status);
+      if (response.ok) {
+        return response.blob().then(blob => {
+          console.log('✅ PDF Blob received:', { size: blob.size, type: blob.type });
+          return URL.createObjectURL(blob);
+        });
+      }
+      throw new Error(`PDF generation failed: ${response.status}`);
     });
   },
 };

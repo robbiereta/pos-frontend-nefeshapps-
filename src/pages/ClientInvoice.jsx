@@ -109,7 +109,7 @@ export default function ClientInvoice() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -125,11 +125,21 @@ export default function ClientInvoice() {
         notasPartidas: items
       };
 
+      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
+
       const response = await invoiceService.generateClient(invoiceData);
-      
+
+      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
+      console.log('📋 Response data:', response?.data);
+      console.log('🆔 Invoice ID:', response?.data?._id);
+      console.log('⏰ Saved at:', response?.data?.savedAt);
+      console.log('📄 UUID:', response?.data?.uuid);
+      console.log('💰 Total:', response?.data?.Total);
+
       setMessage('Factura de cliente generada y timbrada correctamente');
       setResult(response);
     } catch (err) {
+      console.error('Error generating invoice:', err);
       setError(err.message || 'Error al generar la factura');
     } finally {
       setLoading(false);
@@ -1228,14 +1238,30 @@ export default function ClientInvoice() {
           <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Factura Generada Exitosamente</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <p><strong>UUID:</strong> {result.stampData?.uuid || 'N/A'}</p>
-              <p><strong>Folio Fiscal:</strong> {result.stampData?.uuid || 'N/A'}</p>
-              <p><strong>Estado:</strong> {result.stampData?.status || 'Timbrado'}</p>
-              <p><strong>Fecha Timbrado:</strong> {result.stampData?.fechaTimbrado || 'N/A'}</p>
-              <p><strong>Total:</strong> ${result.invoice?.Total || 'N/A'}</p>
+              <p><strong>UUID:</strong> {result.uuid || result.stampData?.uuid || result._id || 'N/A'}</p>
+              <p><strong>Folio:</strong> {result.invoice?.Folio || 'N/A'}</p>
+              <p><strong>Estado:</strong> {result.stampData?.status || 'Generado'}</p>
+              <p><strong>Fecha:</strong> {result.invoice?.Fecha || new Date().toLocaleString('es-MX')}</p>
+              <p><strong>Total:</strong> ${parseFloat(result.invoice?.Total || 0).toFixed(2)}</p>
               <p><strong>Cliente:</strong> {result.invoice?.Receptor?.Nombre || 'N/A'}</p>
             </div>
             
+            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--gray-300)', paddingTop: '1rem' }}>
+              <h3 style={{ marginBottom: '1rem' }}>Detalles de la Factura</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Subtotal</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>${parseFloat(result.invoice?.SubTotal || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>IVA (16%)</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>
+                    ${(parseFloat(result.invoice?.Total || 0) - parseFloat(result.invoice?.SubTotal || 0)).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {result.xml && (
               <div style={{ marginTop: '1rem' }}>
                 <h4>XML del CFDI:</h4>

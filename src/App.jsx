@@ -34,10 +34,9 @@ function Navbar() {
     { path: '/products', label: 'Productos', icon: '📦' },
     { path: '/list-sales', label: 'Ventas', icon: '💾' },
     { path: '/clients', label: 'Clientes', icon: '👥' },
-    { path: '/sale-to-invoice', label: 'Timbrar', icon: '📄' },
     { path: '/invoices', label: 'Facturas', icon: '📋' },
-    { path: '/cash-drawer', label: 'Nuevo Corte', icon: '➕' },
-    { path: '/settings', label: 'Config', icon: '⚙️' },
+    { path: '/cash-drawer', label: 'Cortes de Caja', icon: '➕' },
+    { path: '/settings', label: 'Configuracion', icon: '⚙️' },
   ];
 
   const primaryItems = navItems.filter(item => item.primary);
