@@ -21,7 +21,10 @@ export default function Settings() {
     nombre: '',
     regimenFiscal: '',
     codigoPostal: '',
-    emailFacturacion: ''
+    emailFacturacion: '',
+    direccion: '',
+    telefonoFacturacion: '',
+    receiptMessage: '¡Gracias por su compra!'
   });
 
   const [swInfo, setSwInfo] = useState(null);
@@ -54,7 +57,10 @@ export default function Settings() {
             nombre: config.nombre || '',
             regimenFiscal: config.regimenFiscal || '',
             codigoPostal: config.codigoPostal || '',
-            emailFacturacion: config.emailFacturacion || ''
+            emailFacturacion: config.emailFacturacion || '',
+            direccion: config.direccion || '',
+            telefonoFacturacion: config.telefonoFacturacion || '',
+            receiptMessage: config.receiptMessage || '¡Gracias por su compra!'
           });
 
           // Obtener swConfig desde emisorConfig
@@ -388,6 +394,50 @@ export default function Settings() {
                       onChange={handleEmisorChange}
                       placeholder="facturacion@empresa.com"
                     />
+                  </div>
+
+                  <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Configuración del Recibo (POS)</h3>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="direccion">Dirección</label>
+                      <input
+                        type="text"
+                        id="direccion"
+                        name="direccion"
+                        value={emisorForm.direccion}
+                        onChange={handleEmisorChange}
+                        placeholder="Calle 123, Apartado 456"
+                      />
+                      <small>Se mostrará en el recibo térmico</small>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="telefonoFacturacion">Teléfono</label>
+                      <input
+                        type="tel"
+                        id="telefonoFacturacion"
+                        name="telefonoFacturacion"
+                        value={emisorForm.telefonoFacturacion}
+                        onChange={handleEmisorChange}
+                        placeholder="+52 123 456 7890"
+                      />
+                      <small>Se mostrará en el recibo térmico</small>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="receiptMessage">Mensaje del Recibo</label>
+                    <textarea
+                      id="receiptMessage"
+                      name="receiptMessage"
+                      value={emisorForm.receiptMessage}
+                      onChange={handleEmisorChange}
+                      placeholder="¡Gracias por su compra!"
+                      rows="3"
+                      maxLength="200"
+                    />
+                    <small>Mensaje que aparecerá al pie del recibo ({emisorForm.receiptMessage?.length || 0}/200 caracteres)</small>
                   </div>
 
                   <button

@@ -70,7 +70,13 @@ export const authService = {
 export const invoiceService = {
   getInvoices: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return request(`/api/invoices${query ? `?${query}` : ''}`);
+    return request(`/api/invoices?limit=100&page=1${query ? `&${query}` : ''}`).then(response => ({
+      ...response,
+      data: response.data || []
+    }));
+  },
+  getInvoiceById: async (id) => {
+    return request(`/api/invoices/${id}`).then(response => response.data);
   },
   generateGlobal: async (data) => {
     return request('/api/invoices/global', {
@@ -119,7 +125,7 @@ export const salesService = {
   },
   getAllSales: async (params = { limit: 50, page: 1 }) => {
     const query = new URLSearchParams(params).toString();
-    return request(`/api/sales?${query}`).then(response => response.data);
+    return request(`/api/sales?${query}`).then(response => response.data.sales);
   },
   getSaleById: async (id) => {
     return request(`/api/sales/${id}`);

@@ -1,6 +1,51 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { salesService, cashDrawerService } from '../services/api';
+import { salesService, cashDrawerService, invoiceService, authService } from '../services/api';
+
+const PAYMENT_METHODS = {
+  '01': 'Efectivo',
+  '02': 'Cheque',
+  '03': 'Transferencia',
+  '04': 'Tarjeta de Crédito',
+  '05': 'Monedero Electrónico',
+  '06': 'Dinero Electrónico',
+  '08': 'Vales',
+  '12': 'Dación en Pago',
+  '13': 'Pago por Subrogación',
+  '14': 'Pago por Consignación',
+  '15': 'Condonación',
+  '17': 'Compensación',
+  '23': 'Novación',
+  '24': 'Confusión',
+  '25': 'Remisión de Deuda',
+  '26': 'Prescripción',
+  '27': 'A Plazos',
+  '28': 'Sin Identificar',
+  '29': 'Crédito al Consumo',
+  '30': 'Pago en Especie',
+  'Efectivo': 'Efectivo',
+  'Tarjeta': 'Tarjeta de Crédito',
+  'Transferencia': 'Transferencia',
+  'Cheque': 'Cheque',
+};
+
+const getPaymentMethodName = (code) => {
+  if (!code) return 'Efectivo';
+  return PAYMENT_METHODS[code] || code;
+};
+
+const formatDate = (dateStr) => {
+  try {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      return dateStr;
+    }
+    return date.toLocaleDateString('es-MX');
+  } catch {
+    return dateStr || 'N/A';
+  }
+};
 
 export default function CashDrawer() {
   const navigate = useNavigate();
@@ -8,10 +53,34 @@ export default function CashDrawer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
-    startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
   });
   const [cutoffData, setCutoffData] = useState(null);
+  const [cutoffHistory, setCutoffHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [savedCutoffId, setSavedCutoffId] = useState(null);
+  const [selectedCutoff, setSelectedCutoff] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    setCurrentUser(user);
+    loadCutoffHistory();
+  }, []);
+
+  const loadCutoffHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const response = await cashDrawerService.getCutoffs({ limit: 100, page: 1 });
+      setCutoffHistory(Array.isArray(response?.data) ? response.data : []);
+    } catch (err) {
+      console.error('Error loading cutoff history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     setFormData({
@@ -30,9 +99,8 @@ export default function CashDrawer() {
       const salesArray = Array.isArray(response) ? response : [];
 
       // Filter sales by date range
-      const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
-      endDate.setHours(23, 59, 59, 999);
+      const startDate = new Date(formData.startDate + 'T00:00:00');
+      const endDate = new Date(formData.endDate + 'T23:59:59');
 
       const filteredSales = salesArray.filter(sale => {
         const saleDate = new Date(sale.saleDate);
@@ -76,6 +144,7 @@ export default function CashDrawer() {
         iva,
         byPaymentMethod,
         byStatus,
+        sales: filteredSales,
       });
 
       setStep('preview');
@@ -94,9 +163,12 @@ export default function CashDrawer() {
   const handleSaveCutoff = async () => {
     setLoading(true);
     try {
-      await cashDrawerService.saveCutoff(cutoffData);
+      const response = await cashDrawerService.saveCutoff(cutoffData);
+      setSavedCutoffId(response?.data?.id || response?._id);
       alert('✓ Corte de caja guardado exitosamente');
-      navigate('/cash-drawers-list');
+      loadCutoffHistory();
+      setStep('form');
+      setCutoffData(null);
     } catch (err) {
       console.error('Error saving cutoff:', err);
       alert('Error al guardar el corte: ' + err.message);
@@ -105,40 +177,161 @@ export default function CashDrawer() {
     }
   };
 
+  const buildNotasPartidas = (sales) => {
+    if (!sales || !Array.isArray(sales) || sales.length === 0) {
+      return [];
+    }
+    return sales.map(sale => ({
+      cantidad: 1,
+      pu: sale.total,
+      Descripcion: `Venta ${sale.folio}`,
+      CodigoSat: '01010101',
+      ClaveUnidad: 'E48',
+      Unidad: 'Servicio'
+    }));
+  };
+
+  const handleGenerateInvoice = async () => {
+    if (!cutoffData || !cutoffData.sales || cutoffData.sales.length === 0) {
+      alert('No hay ventas para facturar');
+      return;
+    }
+
+    if (!savedCutoffId) {
+      alert('Debes guardar el corte antes de generar la factura');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const invoiceData = {
+        notasPartidas: buildNotasPartidas(cutoffData.sales),
+        formaPago: '01',
+        MetadoPago: 'PUE',
+        UsoCFDI: 'G01',
+        cashDrawerId: savedCutoffId,
+        userId: currentUser?._id || currentUser?.id
+      };
+
+      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
+
+      const response = await invoiceService.generateGlobal(invoiceData);
+      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
+      console.log('📋 Response data:', response?.data);
+      console.log('🆔 Invoice ID:', response?.data?._id);
+      console.log('⏰ Saved at:', response?.data?.savedAt);
+      console.log('📄 UUID:', response?.data?.uuid);
+      console.log('💰 Total:', response?.data?.Total);
+      alert('✓ Factura global generada exitosamente\nUUID: ' + response.data?.uuid);
+      navigate('/invoices');
+    } catch (err) {
+      console.error('Error generating invoice:', err);
+      alert('Error al generar factura: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const handleNewCutoff = () => {
     setStep('form');
     setCutoffData(null);
+    setSavedCutoffId(null);
     setFormData({
-      startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      startDate: new Date().toISOString().split('T')[0],
       endDate: new Date().toISOString().split('T')[0],
     });
+  };
+
+  const handleQuickInvoice = async (historyCutoff) => {
+    setLoading(true);
+    try {
+      let notasPartidas = buildNotasPartidas(historyCutoff.sales || []);
+
+      // Fallback: if no sales data, create a single line item with the total
+      if (!notasPartidas || notasPartidas.length === 0) {
+        notasPartidas = [{
+          cantidad: 1,
+          pu: historyCutoff.totalAmount || 0,
+          Descripcion: `Corte de caja ${formatDate(historyCutoff.startDate)}`,
+          CodigoSat: '01010101',
+          ClaveUnidad: 'E48',
+          Unidad: 'Servicio'
+        }];
+      }
+
+      const invoiceData = {
+        notasPartidas,
+        formaPago: '01',
+        MetodoPago: 'PUE',
+        UsoCFDI: 'G01',
+        cashDrawerId: historyCutoff._id,
+        userId: currentUser?._id || currentUser?.id
+      };
+
+      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
+
+      const response = await invoiceService.generateGlobal(invoiceData);
+      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
+      console.log('📋 Response data:', response?.data);
+      console.log('🆔 Invoice ID:', response?.data?._id);
+      console.log('⏰ Saved at:', response?.data?.savedAt);
+      console.log('📄 UUID:', response?.data?.uuid);
+      console.log('💰 Total:', response?.data?.Total);
+      alert('✓ Factura global generada exitosamente\nUUID: ' + response.data?.uuid);
+      navigate('/invoices');
+    } catch (err) {
+      console.error('Error generating invoice:', err);
+      alert('Error al generar factura: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewDetails = (cutoff) => {
+    setSelectedCutoff(cutoff);
+  };
+
+  const handleDeleteCutoff = async (cutoffId) => {
+    setLoading(true);
+    try {
+      await cashDrawerService.deleteCutoff(cutoffId);
+      alert('✓ Corte eliminado exitosamente');
+      loadCutoffHistory();
+      setShowDeleteConfirm(null);
+    } catch (err) {
+      console.error('Error deleting cutoff:', err);
+      alert('Error al eliminar corte: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (step === 'preview' && cutoffData) {
     return (
       <div style={{ padding: '2rem' }}>
-        <div style={{ marginBottom: '1rem' }}>
-          <button
-            onClick={handleNewCutoff}
-            style={{
-              backgroundColor: '#6b7280',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            ← Nuevo Corte
-          </button>
-        </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <button
+              onClick={handleNewCutoff}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              ← Nuevo Corte
+            </button>
+          </div>
 
-        <div className="card no-print" style={{ marginBottom: '2rem' }}>
+          <div className="card no-print" style={{ marginBottom: '2rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🧾</div>
             <h2>Corte de Caja</h2>
             <p style={{ color: 'var(--gray-500)', marginTop: '0.5rem' }}>
-              {new Date(cutoffData.startDate).toLocaleDateString('es-MX')} - {new Date(cutoffData.endDate).toLocaleDateString('es-MX')}
+              {formatDate(cutoffData.startDate)} - {formatDate(cutoffData.endDate)}
             </p>
           </div>
 
@@ -163,6 +356,69 @@ export default function CashDrawer() {
                   {cutoffData.totalSales}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Listado de Ventas */}
+          <div style={{
+            border: '1px solid var(--gray-200)',
+            borderRadius: '8px',
+            padding: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>
+              Detalle de Ventas ({cutoffData.sales?.length || 0})
+            </h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Folio</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fecha</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Forma de Pago</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cutoffData.sales?.map((sale, idx) => (
+                    <tr key={idx} style={{
+                      borderBottom: '1px solid var(--gray-200)',
+                      backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)'
+                    }}>
+                      <td style={{ padding: '0.75rem' }}>
+                        {sale.folio || sale._id?.slice(-6) || `#${idx + 1}`}
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        {formatDate(sale.saleDate)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        {getPaymentMethodName(sale.formaPago)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          backgroundColor: sale.status === 'facturado' ? '#10b981' : '#f59e0b',
+                          color: 'white',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '500'
+                        }}>
+                          {sale.status === 'facturado' ? '✓' : '⏳'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        ${(sale.total || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -195,7 +451,7 @@ export default function CashDrawer() {
                       borderBottom: '1px solid var(--gray-200)',
                       backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)'
                     }}>
-                      <td style={{ padding: '0.75rem' }}>{method}</td>
+                      <td style={{ padding: '0.75rem' }}>{getPaymentMethodName(method)}</td>
                       <td style={{ padding: '0.75rem', textAlign: 'center' }}>{data.count}</td>
                       <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
                         ${data.total.toFixed(2)}
@@ -303,11 +559,11 @@ export default function CashDrawer() {
             color: 'var(--gray-600)'
           }}>
             <p><strong>Generado:</strong> {cutoffData.generatedAt}</p>
-            <p><strong>Período:</strong> {new Date(cutoffData.startDate).toLocaleDateString('es-MX')} - {new Date(cutoffData.endDate).toLocaleDateString('es-MX')}</p>
+            <p><strong>Período:</strong> {formatDate(cutoffData.startDate)} - {formatDate(cutoffData.endDate)}</p>
           </div>
         </div>
 
-        <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+        <div className="no-print" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
           <button
             onClick={handleNewCutoff}
             style={{
@@ -331,6 +587,34 @@ export default function CashDrawer() {
             }}
           >
             ← Nuevo Corte
+          </button>
+          <button
+            onClick={handleGenerateInvoice}
+            disabled={loading || !savedCutoffId}
+            style={{
+              backgroundColor: savedCutoffId ? '#f59e0b' : '#d1d5db',
+              color: 'white',
+              border: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '4px',
+              cursor: loading || !savedCutoffId ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: '500',
+              transition: 'all 0.2s',
+              opacity: loading || !savedCutoffId ? 0.7 : 1
+            }}
+            onMouseOver={(e) => {
+              if (!loading && savedCutoffId) {
+                e.target.style.backgroundColor = '#d97706';
+                e.target.style.transform = 'translateY(-1px)';
+              }
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = savedCutoffId ? '#f59e0b' : '#d1d5db';
+              e.target.style.transform = 'translateY(0)';
+            }}
+          >
+            {loading ? '📄 Generando...' : !savedCutoffId ? '📄 Guardar primero' : '📄 Factura Global'}
           </button>
           <button
             onClick={handleSaveCutoff}
@@ -401,39 +685,40 @@ export default function CashDrawer() {
     <>
       <h2 style={{ marginBottom: '1.5rem' }}>Corte de Caja</h2>
 
-      <div className="card">
-        <h3 style={{ marginBottom: '0.5rem' }}>Generar Corte de Caja</h3>
-        <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>
-          Realiza un corte de caja para revisar todas las ventas de un período específico, con desglose por forma de pago y estado.
-        </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        {/* Left: Generate Form */}
+        <div className="card">
+          <h3 style={{ marginBottom: '0.5rem' }}>Generar Corte de Caja</h3>
+          <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>
+            Realiza un corte de caja para revisar todas las ventas de un período específico, con desglose por forma de pago y estado.
+          </p>
 
-        {error && <div className="error-message">{error}</div>}
+          {error && <div className="error-message">{error}</div>}
 
-        <form onSubmit={handleGenerateCutoff} style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="form-group">
-              <label htmlFor="startDate">Fecha Inicial *</label>
-              <input
-                type="date"
-                id="startDate"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="endDate">Fecha Final *</label>
-              <input
-                type="date"
-                id="endDate"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <form onSubmit={handleGenerateCutoff} style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div className="form-group">
+                <label htmlFor="startDate">Fecha Inicial *</label>
+                <input
+                  type="date"
+                  id="startDate"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="endDate">Fecha Final *</label>
+                <input
+                  type="date"
+                  id="endDate"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
               <button
                 type="submit"
                 disabled={loading}
@@ -453,100 +738,433 @@ export default function CashDrawer() {
                 {loading ? '⏳ Generando...' : '✓ Generar Corte'}
               </button>
             </div>
-          </div>
-        </form>
+          </form>
 
-        {/* Quick Shortcuts */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem'
-        }}>
-          <button
-            onClick={() => {
-              const today = new Date();
-              setFormData({
-                startDate: today.toISOString().split('T')[0],
-                endDate: today.toISOString().split('T')[0],
-              });
-            }}
-            style={{
-              padding: '1rem',
-              backgroundColor: 'var(--gray-100)',
-              border: '1px solid var(--gray-300)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-200)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-100)';
-            }}
-          >
-            📅 Hoy
-          </button>
-          <button
-            onClick={() => {
-              const today = new Date();
-              const startOfWeek = new Date(today);
-              startOfWeek.setDate(today.getDate() - today.getDay());
-              setFormData({
-                startDate: startOfWeek.toISOString().split('T')[0],
-                endDate: today.toISOString().split('T')[0],
-              });
-            }}
-            style={{
-              padding: '1rem',
-              backgroundColor: 'var(--gray-100)',
-              border: '1px solid var(--gray-300)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-200)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-100)';
-            }}
-          >
-            📆 Esta Semana
-          </button>
-          <button
-            onClick={() => {
-              const today = new Date();
-              const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-              setFormData({
-                startDate: startOfMonth.toISOString().split('T')[0],
-                endDate: today.toISOString().split('T')[0],
-              });
-            }}
-            style={{
-              padding: '1rem',
-              backgroundColor: 'var(--gray-100)',
-              border: '1px solid var(--gray-300)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: '500',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-200)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = 'var(--gray-100)';
-            }}
-          >
-            📊 Este Mes
-          </button>
+          {/* Quick Shortcuts */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+            gap: '0.75rem'
+          }}>
+            <button
+              onClick={() => {
+                const today = new Date();
+                setFormData({
+                  startDate: today.toISOString().split('T')[0],
+                  endDate: today.toISOString().split('T')[0],
+                });
+              }}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'var(--gray-100)',
+                border: '1px solid var(--gray-300)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-200)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-100)';
+              }}
+            >
+              📅 Hoy
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const startOfWeek = new Date(today);
+                startOfWeek.setDate(today.getDate() - today.getDay());
+                setFormData({
+                  startDate: startOfWeek.toISOString().split('T')[0],
+                  endDate: today.toISOString().split('T')[0],
+                });
+              }}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'var(--gray-100)',
+                border: '1px solid var(--gray-300)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-200)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-100)';
+              }}
+            >
+              📆 Esta Semana
+            </button>
+            <button
+              onClick={() => {
+                const today = new Date();
+                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                setFormData({
+                  startDate: startOfMonth.toISOString().split('T')[0],
+                  endDate: today.toISOString().split('T')[0],
+                });
+              }}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'var(--gray-100)',
+                border: '1px solid var(--gray-300)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-200)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = 'var(--gray-100)';
+              }}
+            >
+              📊 Este Mes
+            </button>
+          </div>
         </div>
+
+        {/* Right: History Table */}
+        <div className="card">
+          <h3 style={{ marginBottom: '1rem' }}>Historial de Cortes</h3>
+          {historyLoading ? (
+            <p style={{ color: 'var(--gray-500)', textAlign: 'center', padding: '2rem' }}>Cargando...</p>
+          ) : cutoffHistory.length === 0 ? (
+            <p style={{ color: 'var(--gray-500)', textAlign: 'center', padding: '2rem' }}>No hay cortes guardados aún</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.85rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Período</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Ventas</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Subtotal</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>IVA</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cutoffHistory.map((cutoff, idx) => (
+                    <tr key={idx} style={{
+                      borderBottom: '1px solid var(--gray-200)',
+                      backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--blue-50)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'white' : 'var(--gray-50)';
+                    }}
+                    >
+                      <td style={{ padding: '0.75rem' }}>
+                        {formatDate(cutoff.startDate)}
+                        {cutoff.endDate && cutoff.startDate !== cutoff.endDate && (
+                          <> - {new Date(cutoff.endDate + 'T00:00:00').toLocaleDateString('es-MX')}</>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        {cutoff.totalSales || 0}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        ${(cutoff.subtotal || 0).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        ${(cutoff.iva || 0).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold' }}>
+                        ${(cutoff.totalAmount || 0).toFixed(2)}
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleViewDetails(cutoff)}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              backgroundColor: '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                              e.target.style.backgroundColor = '#2563eb';
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.backgroundColor = '#3b82f6';
+                            }}
+                          >
+                            👁️ Ver
+                          </button>
+                          <button
+                            onClick={() => handleQuickInvoice(cutoff)}
+                            disabled={loading}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              backgroundColor: '#f59e0b',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              opacity: loading ? 0.7 : 1,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = '#d97706';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.backgroundColor = '#f59e0b';
+                            }}
+                          >
+                            📄 Factura
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(cutoff._id)}
+                            disabled={loading}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              opacity: loading ? 0.7 : 1,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => {
+                              if (!loading) {
+                                e.target.style.backgroundColor = '#dc2626';
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.backgroundColor = '#ef4444';
+                            }}
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Details Modal */}
+        {selectedCutoff && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setSelectedCutoff(null)}
+          >
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '2rem',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3>Detalles del Corte</h3>
+                <button
+                  onClick={() => setSelectedCutoff(null)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    fontSize: '1.5rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Período</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>
+                    {formatDate(selectedCutoff.startDate)}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Total de Ventas</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>{selectedCutoff.totalSales || 0}</p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Subtotal</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>${(selectedCutoff.subtotal || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>IVA (16%)</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>${(selectedCutoff.iva || 0).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Total</p>
+                  <p style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--primary-color)' }}>
+                    ${(selectedCutoff.totalAmount || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {selectedCutoff.byPaymentMethod && Object.keys(selectedCutoff.byPaymentMethod).length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h4 style={{ marginBottom: '1rem' }}>Por Forma de Pago</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {Object.entries(selectedCutoff.byPaymentMethod).map(([method, data], idx) => (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '0.75rem',
+                        backgroundColor: 'var(--gray-50)',
+                        borderRadius: '4px'
+                      }}>
+                        <span>{getPaymentMethodName(method)}</span>
+                        <span style={{ fontWeight: '600' }}>${(data.total || 0).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setSelectedCutoff(null)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: 'var(--gray-200)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => {
+                    handleQuickInvoice(selectedCutoff);
+                    setSelectedCutoff(null);
+                  }}
+                  disabled={loading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    opacity: loading ? 0.7 : 1
+                  }}
+                >
+                  📄 Generar Factura
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowDeleteConfirm(null)}
+          >
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '2rem',
+              maxWidth: '400px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ marginBottom: '1rem', color: '#ef4444' }}>¿Eliminar Corte?</h3>
+              <p style={{ color: 'var(--gray-600)', marginBottom: '2rem' }}>
+                Esta acción no se puede deshacer. ¿Estás seguro de que deseas eliminar este corte de caja?
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowDeleteConfirm(null)}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: 'var(--gray-200)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteCutoff(showDeleteConfirm)}
+                  disabled={loading}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    opacity: loading ? 0.7 : 1
+                  }}
+                >
+                  {loading ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

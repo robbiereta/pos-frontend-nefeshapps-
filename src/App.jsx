@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { authService } from './services/api';
 import Login from './pages/Login';
@@ -10,13 +11,13 @@ import ClientInvoice from './pages/ClientInvoice';
 import ClientInvoiceWorkflow from './pages/ClientInvoiceWorkflow';
 import SaleToInvoice from './pages/SaleToInvoice';
 import CashDrawer from './pages/CashDrawer';
-import CashDrawersList from './pages/CashDrawersList';
 import ClientsPage from './pages/ClientsPage';
 import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
 function Navbar() {
+  const [isOpen, setIsOpen] = React.useState(false);
   const location = useLocation();
   const user = authService.getCurrentUser();
 
@@ -27,37 +28,69 @@ function Navbar() {
 
   const isActive = (path) => location.pathname === path ? 'active' : '';
 
+  const navItems = [
+    { path: '/pos', label: 'POS', icon: '🛒', primary: true },
+    { path: '/dashboard', label: 'Dashboard', icon: '📊', primary: true },
+    { path: '/products', label: 'Productos', icon: '📦' },
+    { path: '/list-sales', label: 'Ventas', icon: '💾' },
+    { path: '/clients', label: 'Clientes', icon: '👥' },
+    { path: '/sale-to-invoice', label: 'Timbrar', icon: '📄' },
+    { path: '/invoices', label: 'Facturas', icon: '📋' },
+    { path: '/cash-drawer', label: 'Nuevo Corte', icon: '➕' },
+    { path: '/settings', label: 'Config', icon: '⚙️' },
+  ];
+
+  const primaryItems = navItems.filter(item => item.primary);
+  const secondaryItems = navItems.filter(item => !item.primary);
+
   return (
-    <nav className="navbar">
-      <h1>🍽️ Nefesh Pos</h1>
-      <div className="nav-links">
-        {/* Operaciones */}
-        <a href="/dashboard" className={isActive('/dashboard')} title="Dashboard">📊 Dashboard</a>
-        <a href="/pos" className={isActive('/pos')} title="Punto de Venta">🛒 POS</a>
-        <a href="/products" className={isActive('/products')} title="Gestión de Productos">📦 Productos</a>
-
-        {/* Ventas y Clientes */}
-        <a href="/list-sales" className={isActive('/list-sales')} title="Historial de Ventas">💾 Ventas</a>
-        <a href="/clients" className={isActive('/clients')} title="Gestión de Clientes">👥 Clientes</a>
-
-        {/* Facturación */}
-        <a href="/sale-to-invoice" className={isActive('/sale-to-invoice')} title="Convertir Venta a Factura">📄 Timbrar</a>
-        <a href="/global-invoice" className={isActive('/global-invoice')} title="Factura Consolidada">🏢 Global</a>
-        <a href="/client-invoice" className={isActive('/client-invoice')} title="Factura por Cliente">👤 Cliente</a>
-        <a href="/invoices" className={isActive('/invoices')} title="Listado de Facturas">📋 Facturas</a>
-
-        {/* Reportes */}
-        <a href="/cash-drawer" className={isActive('/cash-drawer')} title="Crear nuevo Corte de Caja">➕ Corte</a>
-        <a href="/cash-drawers-list" className={isActive('/cash-drawers-list')} title="Historial de Cortes">📈 Cortes</a>
-
-        {/* Configuración */}
-        <a href="/settings" className={isActive('/settings')} title="Configuración del Negocio">⚙️ Config</a>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: '0.9rem', opacity: 0.95 }}>👤 {user?.email || 'Usuario'}</span>
-        <button onClick={handleLogout}>🚪 Salir</button>
-      </div>
-    </nav>
+    <>
+      <nav className="navbar">
+        <h1 className="navbar-brand">Nefesh</h1>
+        <button className={`hamburger ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(!isOpen)} aria-label="Menú">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <div className={`nav-menu ${isOpen ? 'open' : ''}`}>
+          <div className="nav-primary">
+            {primaryItems.map(item => (
+              <a
+                key={item.path}
+                href={item.path}
+                className={`nav-item primary ${isActive(item.path)}`}
+                onClick={() => setIsOpen(false)}
+              >
+                <span className="icon">{item.icon}</span>
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </div>
+          <div className="nav-divider"></div>
+          <div className="nav-secondary">
+            {secondaryItems.map(item => (
+              <a
+                key={item.path}
+                href={item.path}
+                className={`nav-item ${isActive(item.path)}`}
+                onClick={() => setIsOpen(false)}
+              >
+                <span className="icon">{item.icon}</span>
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </div>
+          <div className="nav-divider"></div>
+          <div className="nav-footer">
+            <div className="user-info">
+              <span className="user-email">👤 {user?.email || 'Usuario'}</span>
+            </div>
+            <button className="btn-logout" onClick={handleLogout}>🚪 Salir</button>
+          </div>
+        </div>
+      </nav>
+      {isOpen && <div className="nav-overlay" onClick={() => setIsOpen(false)}></div>}
+    </>
   );
 }
 
@@ -180,17 +213,6 @@ function App() {
               <Navbar />
               <main className="main-content">
                 <ClientsPage />
-              </main>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/cash-drawers-list"
-          element={
-            <ProtectedRoute>
-              <Navbar />
-              <main className="main-content">
-                <CashDrawersList />
               </main>
             </ProtectedRoute>
           }
