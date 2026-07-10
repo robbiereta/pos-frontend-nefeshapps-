@@ -401,6 +401,7 @@ const Pos = () => {
       <body>
         <div class="receipt">
           <div class="header">
+            ${emisor?.nombreComercial ? `<div class="title" style="font-size: 14pt;">${emisor.nombreComercial}</div>` : ''}
             <div class="title">${emisor?.nombre || 'PUNTO DE VENTA'}</div>
             <div class="subtitle">RFC: ${emisor?.rfc || 'N/A'}</div>
             ${emisor?.regimenFiscal ? `<div class="subtitle" style="font-size: 7pt;">Régimen: ${emisor.regimenFiscal}</div>` : ''}

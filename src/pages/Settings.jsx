@@ -19,6 +19,7 @@ export default function Settings() {
   const [emisorForm, setEmisorForm] = useState({
     rfc: '',
     nombre: '',
+    nombreComercial: '',
     regimenFiscal: '',
     codigoPostal: '',
     emailFacturacion: '',
@@ -62,6 +63,7 @@ export default function Settings() {
           setEmisorForm({
             rfc: config.rfc || '',
             nombre: config.nombre || '',
+            nombreComercial: config.nombreComercial || '',
             regimenFiscal: config.regimenFiscal || '',
             codigoPostal: config.codigoPostal || '',
             emailFacturacion: config.emailFacturacion || '',
@@ -281,6 +283,19 @@ export default function Settings() {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="nombreComercial">Nombre Comercial</label>
+                    <input
+                      type="text"
+                      id="nombreComercial"
+                      name="nombreComercial"
+                      value={emisorForm.nombreComercial}
+                      onChange={handleEmisorChange}
+                      placeholder="El nombre que aparecerá en el recibo (ej: Mi Restaurante)"
+                    />
+                    <small>Se mostrará en el recibo térmico si se configura</small>
                   </div>
 
                   <div className="form-row">
