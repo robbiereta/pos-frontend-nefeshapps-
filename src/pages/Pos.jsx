@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { salesService, userService } from '../services/api';
+import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
 
 const Pos = () => {
@@ -7,12 +7,18 @@ const Pos = () => {
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(true);
+  const [selectedClientId, setSelectedClientId] = useState('default');
+  const [clientSearch, setClientSearch] = useState('');
+  const [editingPriceId, setEditingPriceId] = useState(null);
+  const [editingPriceValue, setEditingPriceValue] = useState('');
   const [customer, setCustomer] = useState({
     rfc: 'XAXX010101000',
     nombre: 'PUBLICO EN GENERAL',
     usoCFDI: 'G03',
-    domicilioFiscalReceptor: '87000',
-    regimenFiscalReceptor: '616',
+    domicilioFiscalReceptor: '',
+    regimenFiscalReceptor: '',
     email: ''
   });
   const [paymentMethod, setPaymentMethod] = useState('PUE');
@@ -20,11 +26,25 @@ const Pos = () => {
   const [loading, setLoading] = useState(false);
   const [emisor, setEmisor] = useState(null);
 
-  // Fetch products and emisor config on mount
+  // Fetch products, clients, and emisor config on mount
   useEffect(() => {
     fetchProducts();
+    fetchClients();
     fetchEmisorConfig();
   }, []);
+
+  const fetchClients = async () => {
+    try {
+      setLoadingClients(true);
+      const response = await clientService.getAllClients({ limit: 100 });
+      setClients(response.data?.clients || response.data || []);
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+      setClients([]);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
 
   const fetchEmisorConfig = async () => {
     try {
@@ -33,6 +53,66 @@ const Pos = () => {
     } catch (err) {
       console.error('Error fetching emisor config:', err);
     }
+  };
+
+  const handleClientChange = (clientId) => {
+    setSelectedClientId(clientId);
+    setClientSearch('');
+    if (clientId === 'default') {
+      setCustomer({
+        rfc: 'XAXX010101000',
+        nombre: 'PUBLICO EN GENERAL',
+      });
+    } else {
+      const selectedClient = clients.find(c => c._id === clientId);
+      if (selectedClient) {
+        setCustomer({
+          rfc: selectedClient.rfc,
+          nombre: selectedClient.nombre,
+          usoCFDI: selectedClient.usoCFDI || 'G03',
+          domicilioFiscalReceptor: selectedClient.domicilioFiscalReceptor || '87000',
+          regimenFiscalReceptor: selectedClient.regimenFiscalReceptor || '616',
+          email: selectedClient.email || ''
+        });
+      }
+    }
+  };
+
+  const filteredClients = clients.filter(client =>
+    client.nombre.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    client.rfc.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
+  const handleUpdateItemPrice = (itemId, newPrice) => {
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price <= 0) return;
+
+    setCart(cart.map(item => {
+      if (item.id === itemId) {
+        const newImporte = item.cantidad * price;
+        const baseAmount = newImporte / 1.16;
+        const ivaAmount = newImporte - baseAmount;
+
+        return {
+          ...item,
+          valorUnitario: price,
+          importe: newImporte,
+          impuestos: {
+            traslados: [{
+              base: baseAmount,
+              impuesto: '002',
+              tipoFactor: 'Tasa',
+              tasaOCuota: '0.160000',
+              importe: ivaAmount
+            }]
+          }
+        };
+      }
+      return item;
+    }));
+
+    setEditingPriceId(null);
+    setEditingPriceValue('');
   };
 
   const fetchProducts = async () => {
@@ -214,7 +294,7 @@ const Pos = () => {
     setCart([]);
   };
 
-  // Generate thermal receipt (58mm width)
+  // Generate thermal receipt
   const generateThermalReceipt = (saleData, folio) => {
     const total = calculateTotal();
     const subtotal = calculateSubtotal();
@@ -222,6 +302,10 @@ const Pos = () => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-MX');
     const timeStr = now.toLocaleTimeString('es-MX');
+
+    const receiptWidth = emisor?.receiptWidth || '58mm';
+    const fontSize = receiptWidth === '80mm' ? '11pt' : '10pt';
+    const padding = receiptWidth === '80mm' ? '5mm' : '4mm';
 
     const receiptHTML = `
       <!DOCTYPE html>
@@ -233,13 +317,13 @@ const Pos = () => {
           * { margin: 0; padding: 0; }
           body {
             font-family: 'Courier New', monospace;
-            width: 58mm;
-            font-size: 10pt;
+            width: ${receiptWidth};
+            font-size: ${fontSize};
             line-height: 1.2;
           }
           .receipt {
-            width: 58mm;
-            padding: 4mm;
+            width: ${receiptWidth};
+            padding: ${padding};
             text-align: center;
           }
           .header {
@@ -290,6 +374,19 @@ const Pos = () => {
             font-size: 12pt;
             margin: 2mm 0;
           }
+          .customer-section {
+            text-align: left;
+            margin: 3mm 0;
+            padding: 2mm;
+            background-color: #f5f5f5;
+            border: 1px dashed #000;
+            font-size: 8pt;
+          }
+          .section-title {
+            font-weight: bold;
+            font-size: 8pt;
+            margin-bottom: 1mm;
+          }
           .footer {
             margin-top: 4mm;
             font-size: 8pt;
@@ -306,12 +403,23 @@ const Pos = () => {
           <div class="header">
             <div class="title">${emisor?.nombre || 'PUNTO DE VENTA'}</div>
             <div class="subtitle">RFC: ${emisor?.rfc || 'N/A'}</div>
-            ${emisor?.direccion ? `<div class="subtitle">${emisor.direccion}</div>` : ''}
+            ${emisor?.regimenFiscal ? `<div class="subtitle" style="font-size: 7pt;">Régimen: ${emisor.regimenFiscal}</div>` : ''}
+            ${emisor?.calle ? `<div class="subtitle">${emisor.calle} ${emisor?.numeroExterior || ''}</div>` : ''}
+            ${emisor?.colonia ? `<div class="subtitle">${emisor.colonia}</div>` : ''}
+            ${emisor?.ciudad || emisor?.estado ? `<div class="subtitle">${emisor?.ciudad || ''} ${emisor?.estado || ''}</div>` : ''}
+            ${emisor?.codigoPostal ? `<div class="subtitle">CP: ${emisor.codigoPostal}</div>` : ''}
           </div>
 
           <div class="folio-section">
             <div class="folio">Folio: ${folio}</div>
             <div class="date-time">${dateStr} ${timeStr}</div>
+          </div>
+
+          <div class="customer-section">
+            <div class="section-title">CLIENTE:</div>
+            <div>${customer.nombre}</div>
+            <div>RFC: ${customer.rfc}</div>
+            ${customer.email ? `<div>Email: ${customer.email}</div>` : ''}
           </div>
 
           <div class="items">
@@ -397,12 +505,12 @@ const Pos = () => {
       const totalImpuestosTrasladados = calculateTax();
       const subtotal = calculateSubtotal();
 
-      // Generate unique folio
+      // Generate unique folio with random suffix to avoid collisions
       const timestamp = Date.now();
-      const folio = `POS-${timestamp}`;
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const folio = `POS${timestamp}${random}`;
 
       const saleData = {
-        folio,
         saleId: `SALE-${timestamp}`,
         externalReference: `POS-ORDER-${timestamp}`,
         saleDate: new Date(),
@@ -448,10 +556,10 @@ const Pos = () => {
       const response = await salesService.createSale(saleData);
 
       // Generate and print thermal receipt
-      const receiptHTML = generateThermalReceipt(saleData, folio);
+      const receiptHTML = generateThermalReceipt(saleData, response.data?.folio || folio);
       printThermalReceipt(receiptHTML);
 
-      alert(`Venta procesada exitosamente!\nFolio: ${folio}\nTotal: $${total.toFixed(2)}`);
+      alert(`Venta procesada exitosamente!\nFolio: ${response.data?.folio || folio}\nTotal: $${total.toFixed(2)}`);
       clearCart();
 
     } catch (error) {
@@ -567,9 +675,83 @@ const Pos = () => {
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '600', color: '#333' }}>
                           {item.descripcion}
                         </h4>
-                        <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
-                          ${item.valorUnitario.toFixed(2)} c/u
-                        </p>
+                        {editingPriceId === item.id ? (
+                          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                            <input
+                              type="number"
+                              value={editingPriceValue}
+                              onChange={(e) => setEditingPriceValue(e.target.value)}
+                              placeholder="Nuevo precio"
+                              autoFocus
+                              style={{
+                                flex: 1,
+                                padding: '4px 6px',
+                                fontSize: '12px',
+                                borderRadius: '4px',
+                                border: '1px solid #667eea',
+                                boxSizing: 'border-box'
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleUpdateItemPrice(item.id, editingPriceValue);
+                                } else if (e.key === 'Escape') {
+                                  setEditingPriceId(null);
+                                  setEditingPriceValue('');
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleUpdateItemPrice(item.id, editingPriceValue)}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontWeight: '600'
+                              }}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingPriceId(null);
+                                setEditingPriceValue('');
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '11px',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <p
+                            onClick={() => {
+                              setEditingPriceId(item.id);
+                              setEditingPriceValue(item.valorUnitario.toString());
+                            }}
+                            style={{
+                              margin: 0,
+                              fontSize: '12px',
+                              color: '#667eea',
+                              cursor: 'pointer',
+                              fontWeight: '600',
+                              textDecoration: 'underline'
+                            }}
+                            title="Click para editar precio"
+                          >
+                            ${item.valorUnitario.toFixed(2)} c/u
+                          </p>
+                        )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#667eea' }}>
@@ -710,9 +892,10 @@ const Pos = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="RFC"
-                    value={customer.rfc}
-                    onChange={(e) => setCustomer({...customer, rfc: e.target.value})}
+                    placeholder="Buscar cliente por nombre o RFC..."
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    disabled={loadingClients}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
@@ -720,38 +903,95 @@ const Pos = () => {
                       fontSize: '12px',
                       borderRadius: '6px',
                       border: '1px solid #dee2e6',
+                      backgroundColor: '#fff',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <input
-                    type="text"
-                    placeholder="Nombre"
-                    value={customer.nombre}
-                    onChange={(e) => setCustomer({...customer, nombre: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      marginBottom: '8px',
-                      fontSize: '12px',
-                      borderRadius: '6px',
+
+                  {clientSearch && (
+                    <div style={{
                       border: '1px solid #dee2e6',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={customer.email}
-                    onChange={(e) => setCustomer({...customer, email: e.target.value})}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      fontSize: '12px',
-                      borderRadius: '6px',
-                      border: '1px solid #dee2e6',
-                      boxSizing: 'border-box'
-                    }}
-                  />
+                      borderTop: 'none',
+                      borderRadius: '0 0 6px 6px',
+                      backgroundColor: '#fff',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      marginBottom: '12px',
+                      fontSize: '12px'
+                    }}>
+                      <div
+                        onClick={() => handleClientChange('default')}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid #f0f0f0',
+                          backgroundColor: selectedClientId === 'default' ? '#f0f7ff' : 'transparent',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseOver={(e) => e.target.style.backgroundColor = '#f0f7ff'}
+                        onMouseOut={(e) => e.target.style.backgroundColor = selectedClientId === 'default' ? '#f0f7ff' : 'transparent'}
+                      >
+                        PÚBLICO EN GENERAL
+                      </div>
+                      {filteredClients.length > 0 ? (
+                        filteredClients.map(client => (
+                          <div
+                            key={client._id}
+                            onClick={() => handleClientChange(client._id)}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f0f0f0',
+                              backgroundColor: selectedClientId === client._id ? '#f0f7ff' : 'transparent',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#f0f7ff'}
+                            onMouseOut={(e) => e.target.style.backgroundColor = selectedClientId === client._id ? '#f0f7ff' : 'transparent'}
+                          >
+                            <div style={{ fontWeight: '600', color: '#333' }}>{client.nombre}</div>
+                            <div style={{ fontSize: '11px', color: '#999' }}>RFC: {client.rfc}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ padding: '8px 12px', color: '#999', textAlign: 'center' }}>
+                          No hay clientes que coincidan
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!clientSearch && (
+                    <select
+                      value={selectedClientId}
+                      onChange={(e) => handleClientChange(e.target.value)}
+                      disabled={loadingClients}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        marginBottom: '12px',
+                        fontSize: '12px',
+                        borderRadius: '6px',
+                        border: '1px solid #dee2e6',
+                        backgroundColor: '#fff',
+                        cursor: loadingClients ? 'not-allowed' : 'pointer',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="default">PÚBLICO EN GENERAL</option>
+                      {clients.map(client => (
+                        <option key={client._id} value={client._id}>
+                          {client.nombre} ({client.rfc})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div style={{ fontSize: '11px', color: '#666', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+                    <p style={{ margin: '0 0 4px 0', fontWeight: '600' }}>Detalles:</p>
+                    <p style={{ margin: '2px 0' }}>RFC: <strong>{customer.rfc}</strong></p>
+                    <p style={{ margin: '2px 0' }}>Nombre: <strong>{customer.nombre}</strong></p>
+                    {customer.email && <p style={{ margin: '2px 0' }}>Email: <strong>{customer.email}</strong></p>}
+                  </div>
                 </div>
               </div>
 

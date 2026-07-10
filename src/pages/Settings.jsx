@@ -22,9 +22,16 @@ export default function Settings() {
     regimenFiscal: '',
     codigoPostal: '',
     emailFacturacion: '',
-    direccion: '',
     telefonoFacturacion: '',
-    receiptMessage: '¡Gracias por su compra!'
+    calle: '',
+    numeroExterior: '',
+    numeroInterior: '',
+    colonia: '',
+    ciudad: '',
+    estado: '',
+    pais: 'México',
+    receiptMessage: '¡Gracias por su compra!',
+    receiptWidth: '58mm'
   });
 
   const [swInfo, setSwInfo] = useState(null);
@@ -50,17 +57,24 @@ export default function Settings() {
       // Cargar emisor config con sw_config
       try {
         const emisorResponse = await userService.getEmisorConfig();
-        if (emisorResponse.data?.emisorConfig) {
-          const config = emisorResponse.data.emisorConfig;
+        if (emisorResponse.data) {
+          const config = emisorResponse.data;
           setEmisorForm({
             rfc: config.rfc || '',
             nombre: config.nombre || '',
             regimenFiscal: config.regimenFiscal || '',
             codigoPostal: config.codigoPostal || '',
             emailFacturacion: config.emailFacturacion || '',
-            direccion: config.direccion || '',
             telefonoFacturacion: config.telefonoFacturacion || '',
-            receiptMessage: config.receiptMessage || '¡Gracias por su compra!'
+            calle: config.calle || '',
+            numeroExterior: config.numeroExterior || '',
+            numeroInterior: config.numeroInterior || '',
+            colonia: config.colonia || '',
+            ciudad: config.ciudad || '',
+            estado: config.estado || '',
+            pais: config.pais || 'México',
+            receiptMessage: config.receiptMessage || '¡Gracias por su compra!',
+            receiptWidth: config.receiptWidth || '58mm'
           });
 
           // Obtener swConfig desde emisorConfig
@@ -222,46 +236,6 @@ export default function Settings() {
                     </p>
                   </div>
                 </div>
-
-                <form onSubmit={handleUpdateProfile} className="form-section">
-                  <h3>Editar Información</h3>
-
-                  <div className="form-group">
-                    <label htmlFor="fullName">Nombre Completo</label>
-                    <input
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={userForm.fullName}
-                      onChange={handleUserChange}
-                      placeholder="Tu nombre completo"
-                      maxLength="100"
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="rfc">RFC (Opcional)</label>
-                    <input
-                      type="text"
-                      id="rfc"
-                      name="rfc"
-                      value={userForm.rfc}
-                      onChange={handleUserChange}
-                      placeholder="XAXX010101000"
-                      maxLength="13"
-                      style={{ textTransform: 'uppercase' }}
-                    />
-                    <small>Formato: 12-13 caracteres</small>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={loading}
-                  >
-                    {loading ? 'Guardando...' : 'Guardar Cambios'}
-                  </button>
-                </form>
               </div>
             </div>
           )}
@@ -296,7 +270,7 @@ export default function Settings() {
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="nombre_emisor">Nombre Legal del Emisor *</label>
+                      <label htmlFor="nombre_emisor">Razon social: *</label>
                       <input
                         type="text"
                         id="nombre_emisor"
@@ -320,51 +294,9 @@ export default function Settings() {
                         required
                       >
                         <option value="">Selecciona un régimen</option>
-                        <optgroup label="Personas Morales">
-                          <option value="601">601 - General de Ley Personas Morales</option>
-                          <option value="602">602 - Personas Morales con Fines No Lucrativos</option>
-                          <option value="605">605 - Personas Morales Residentes en el Extranjero Sin Establecimiento Permanente</option>
-                          <option value="606">606 - Régimen de Enajenación o Adquisición de Bienes</option>
-                          <option value="607">607 - Régimen de Prestación de Servicios</option>
-                          <option value="608">608 - Actividades Agrícolas, Ganaderas, Silvícolas o Pesqueras</option>
-                          <option value="609">609 - Ganaderos</option>
-                          <option value="610">610 - Personas Físicas con Actividades Empresariales y Profesionales</option>
-                          <option value="614">614 - Personas Morales en Régimen de Incorporación Fiscal</option>
-                          <option value="616">616 - Personas Morales en Régimen de Transparencia Fiscal</option>
-                          <option value="620">620 - Sociedades Mercantiles en Liquidación</option>
-                          <option value="622">622 - Régimen de Pequeños Contribuyentes</option>
-                          <option value="623">623 - Personas Morales de Saneamiento de Entidades Federativas</option>
-                          <option value="624">624 - Sistema de Cobro para Adiciones de Ingresos</option>
-                          <option value="625">625 - Régimen de Ingresos Fijos</option>
-                          <option value="626">626 - Régimen Especial de Incorporación Fiscal</option>
-                          <option value="627">627 - Sociedades de Producción Rural</option>
-                          <option value="628">628 - Sindicatos y Asociaciones de Trabajadores</option>
-                          <option value="629">629 - Instituciones de Seguros</option>
-                          <option value="630">630 - Sociedades Financieras de Objeto Limitado</option>
-                          <option value="631">631 - Instituciones para el Fomento de la Agricultura</option>
-                          <option value="632">632 - Sociedades de Inversión en Valores</option>
-                          <option value="633">633 - Sociedades de Inversión de Renta Variable</option>
-                          <option value="634">634 - Administradora de Portafolios, Inversiones y Valores</option>
-                          <option value="635">635 - Societarios y Asimilados</option>
-                          <option value="636">636 - Otro Tipo de Personas Morales No Clasificadas</option>
-                          <option value="637">637 - Entidades Paraestatales</option>
-                          <option value="638">638 - Personas Morales Extranjeras</option>
-                        </optgroup>
-                        <optgroup label="Personas Físicas">
-                          <option value="603">603 - Personas Físicas con Actividades Empresariales y Profesionales</option>
-                          <option value="611">611 - Personas Físicas en Régimen de Incorporación Fiscal</option>
-                          <option value="612">612 - Personas Físicas en Régimen de Transparencia Fiscal</option>
-                          <option value="618">618 - Personas Físicas Tributando en Actividades de Fondos de Terceros</option>
-                          <option value="621">621 - Sucesiones en Liquidación</option>
-                        </optgroup>
-                        <optgroup label="Residentes Extranjeros">
-                          <option value="604">604 - Personas Físicas Residentes en el Extranjero sin Establecimiento Permanente</option>
-                          <option value="613">613 - Personas Morales Residentes en el Extranjero Sin Establecimiento Permanente</option>
-                          <option value="615">615 - Personas Físicas con Actividades Empresariales no Profesionales Tributando en RIF</option>
-                          <option value="617">617 - Personas Morales con Actividades Empresariales Tributando en RIF</option>
-                          <option value="619">619 - Personas Morales Tributando en Actividades de Fondos de Terceros en RIF</option>
-                          <option value="639">639 - Personas Físicas Jubiladas que Opten por Régimen de RIF</option>
-                        </optgroup>
+                          <option value="601">601 - Regimen General de Personas Morales</option>  
+                          <option value="610">612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+                          <option value="626">626 - Regimen Simplificado de Confianza</option>                          
                       </select>
                     </div>
 
@@ -396,20 +328,111 @@ export default function Settings() {
                     />
                   </div>
 
+                  <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Dirección Fiscal</h3>
+
+                  <div className="form-group">
+                    <label htmlFor="calle">Calle *</label>
+                    <input
+                      type="text"
+                      id="calle"
+                      name="calle"
+                      value={emisorForm.calle}
+                      onChange={handleEmisorChange}
+                      placeholder="Avenida Principal"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="numeroExterior">Número Exterior</label>
+                      <input
+                        type="text"
+                        id="numeroExterior"
+                        name="numeroExterior"
+                        value={emisorForm.numeroExterior}
+                        onChange={handleEmisorChange}
+                        placeholder="123"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="numeroInterior">Número Interior</label>
+                      <input
+                        type="text"
+                        id="numeroInterior"
+                        name="numeroInterior"
+                        value={emisorForm.numeroInterior}
+                        onChange={handleEmisorChange}
+                        placeholder="456"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="colonia">Colonia/Localidad</label>
+                    <input
+                      type="text"
+                      id="colonia"
+                      name="colonia"
+                      value={emisorForm.colonia}
+                      onChange={handleEmisorChange}
+                      placeholder="Centro"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="ciudad">Ciudad</label>
+                      <input
+                        type="text"
+                        id="ciudad"
+                        name="ciudad"
+                        value={emisorForm.ciudad}
+                        onChange={handleEmisorChange}
+                        placeholder="Ciudad de México"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="estado">Estado</label>
+                      <input
+                        type="text"
+                        id="estado"
+                        name="estado"
+                        value={emisorForm.estado}
+                        onChange={handleEmisorChange}
+                        placeholder="Ciudad de México"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="pais">País</label>
+                      <input
+                        type="text"
+                        id="pais"
+                        name="pais"
+                        value={emisorForm.pais}
+                        onChange={handleEmisorChange}
+                        placeholder="México"
+                      />
+                    </div>
+                  </div>
+
                   <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Configuración del Recibo (POS)</h3>
 
                   <div className="form-row">
                     <div className="form-group">
-                      <label htmlFor="direccion">Dirección</label>
-                      <input
-                        type="text"
-                        id="direccion"
-                        name="direccion"
-                        value={emisorForm.direccion}
+                      <label htmlFor="receiptWidth">Ancho del Recibo</label>
+                      <select
+                        id="receiptWidth"
+                        name="receiptWidth"
+                        value={emisorForm.receiptWidth}
                         onChange={handleEmisorChange}
-                        placeholder="Calle 123, Apartado 456"
-                      />
-                      <small>Se mostrará en el recibo térmico</small>
+                      >
+                        <option value="58mm">58mm - Térmica estándar</option>
+                        <option value="80mm">80mm - Térmica grande</option>
+                      </select>
+                      <small>Tamaño del papel para la impresora térmica</small>
                     </div>
 
                     <div className="form-group">

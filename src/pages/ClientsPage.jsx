@@ -4,10 +4,14 @@ import './ClientsPage.css';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState([]);
+  const [displayedClients, setDisplayedClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [formData, setFormData] = useState({
     rfc: '',
     nombre: '',
@@ -25,6 +29,18 @@ export default function ClientsPage() {
   useEffect(() => {
     loadClients();
   }, []);
+
+  useEffect(() => {
+    const filtered = clients.filter(client =>
+      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setDisplayedClients(filtered.slice(startIndex, endIndex));
+  }, [searchQuery, currentPage, clients]);
 
   const loadClients = async () => {
     try {
@@ -325,25 +341,46 @@ export default function ClientsPage() {
 
       <div className="clients-list">
         <h2>Lista de Clientes ({clients.length})</h2>
+
+        <input
+          type="text"
+          placeholder="Buscar por nombre, RFC o email..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            marginBottom: '15px',
+            fontSize: '14px',
+            borderRadius: '4px',
+            border: '1px solid #ddd',
+            boxSizing: 'border-box'
+          }}
+        />
+
         {loading ? (
           <p>Cargando...</p>
         ) : clients.length === 0 ? (
           <p>No hay clientes registrados</p>
         ) : (
-          <table className="clients-table">
-            <thead>
-              <tr>
-                <th>RFC</th>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Teléfono</th>
-                <th>CP</th>
-                <th>Régimen</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map(client => (
+          <>
+            <table className="clients-table">
+              <thead>
+                <tr>
+                  <th>RFC</th>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Teléfono</th>
+                  <th>CP</th>
+                  <th>Régimen</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedClients.map(client => (
                 <tr key={client._id}>
                   <td className="rfc">{client.rfc}</td>
                   <td className="nombre">{client.nombre}</td>
@@ -369,6 +406,71 @@ export default function ClientsPage() {
               ))}
             </tbody>
           </table>
+
+            {Math.ceil(
+              clients.filter(client =>
+                client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+              ).length / itemsPerPage
+            ) > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="btn"
+                  style={{ padding: '8px 12px', opacity: currentPage === 1 ? 0.5 : 1 }}
+                >
+                  ◀◀ Primera
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="btn"
+                  style={{ padding: '8px 12px', opacity: currentPage === 1 ? 0.5 : 1 }}
+                >
+                  ◀ Anterior
+                </button>
+
+                <span style={{ margin: '0 8px', fontSize: '14px', fontWeight: '600' }}>
+                  Página {currentPage} de {Math.ceil(
+                    clients.filter(client =>
+                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  )}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(
+                    clients.filter(client =>
+                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  ), p + 1))}
+                  disabled={currentPage === Math.ceil(
+                    clients.filter(client =>
+                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  )}
+                  className="btn"
+                  style={{ padding: '8px 12px', opacity: currentPage === Math.ceil(
+                    clients.filter(client =>
+                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  ) ? 0.5 : 1 }}
+                >
+                  Siguiente ▶
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

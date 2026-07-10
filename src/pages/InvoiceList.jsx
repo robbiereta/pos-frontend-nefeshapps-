@@ -16,6 +16,7 @@ const formatDate = (dateStr) => {
 
 export default function InvoiceList() {
   const [invoices, setInvoices] = useState([]);
+  const [displayedInvoices, setDisplayedInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
@@ -23,10 +24,26 @@ export default function InvoiceList() {
     fechaFin: '',
   });
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchInvoices();
   }, []);
+
+  useEffect(() => {
+    const filtered = invoices.filter(invoice =>
+      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setDisplayedInvoices(filtered.slice(startIndex, endIndex));
+  }, [searchQuery, currentPage, invoices]);
 
   const fetchInvoices = async (params = {}) => {
     setLoading(true);
@@ -113,31 +130,52 @@ export default function InvoiceList() {
 
       {error && <div className="error-message">{error}</div>}
 
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <input
+          type="text"
+          placeholder="Buscar por folio, UUID, nombre o RFC del receptor..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            fontSize: '14px',
+            borderRadius: '4px',
+            border: '1px solid #ddd',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+
       <div className="card">
         {invoices.length === 0 ? (
           <div className="empty-state">No hay facturas disponibles</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: '0.9rem'
-            }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>UUID</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fecha</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Folio</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Receptor</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Subtotal</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>IVA</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice, idx) => (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--gray-100)', borderBottom: '2px solid var(--gray-300)' }}>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>UUID</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fecha</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Folio</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Receptor</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Subtotal</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>IVA</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedInvoices.map((invoice, idx) => (
                   <tr key={invoice._id || invoice.uuid} style={{
                     borderBottom: '1px solid var(--gray-200)',
                     backgroundColor: idx % 2 === 0 ? 'white' : 'var(--gray-50)',
@@ -209,10 +247,87 @@ export default function InvoiceList() {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {Math.ceil(
+              invoices.filter(invoice =>
+                (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+              ).length / itemsPerPage
+            ) > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  style={{ padding: '8px 12px', opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                  className="btn"
+                >
+                  ◀◀ Primera
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{ padding: '8px 12px', opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+                  className="btn"
+                >
+                  ◀ Anterior
+                </button>
+
+                <span style={{ margin: '0 8px', fontSize: '14px', fontWeight: '600' }}>
+                  Página {currentPage} de {Math.ceil(
+                    invoices.filter(invoice =>
+                      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  )}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(
+                    invoices.filter(invoice =>
+                      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  ), p + 1))}
+                  disabled={currentPage === Math.ceil(
+                    invoices.filter(invoice =>
+                      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  )}
+                  style={{ padding: '8px 12px', cursor: currentPage === Math.ceil(
+                    invoices.filter(invoice =>
+                      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  ) ? 'not-allowed' : 'pointer', opacity: currentPage === Math.ceil(
+                    invoices.filter(invoice =>
+                      (invoice.folio || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.uuid || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.nombre || invoice.receptorName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      (invoice.receptor?.rfc || invoice.receptorRfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).length / itemsPerPage
+                  ) ? 0.5 : 1 }}
+                  className="btn"
+                >
+                  Siguiente ▶
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

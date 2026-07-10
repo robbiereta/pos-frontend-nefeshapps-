@@ -5,24 +5,29 @@ import './ListSales.css';
 
 const ListSales = () => {
   const navigate = useNavigate();
-  const [sales, setSales] = useState([]);
+  const [allSales, setAllSales] = useState([]);
+  const [displayedSales, setDisplayedSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSale, setSelectedSale] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   const getSales = async () => {
     try {
       setLoading(true);
       setError(null);
       console.log('📋 Fetching sales...');
-      const salesData = await salesService.getAllSales();
+      const salesData = await salesService.getAllSales({ limit: 1000 });
       console.log('📋 Sales data received:', JSON.stringify(salesData, null, 2));
       console.log('📋 Sales data type:', typeof salesData);
       console.log('📋 Is array:', Array.isArray(salesData));
       console.log('📋 Sales length:', Array.isArray(salesData) ? salesData.length : 'not an array');
-      setSales(Array.isArray(salesData) ? salesData : []);
+      setAllSales(Array.isArray(salesData) ? salesData : []);
+      setCurrentPage(1);
     } catch (error) {
       console.error('❌ Error fetching sales:', error);
       setError(error.message || 'Error loading sales');
@@ -34,6 +39,26 @@ const ListSales = () => {
   useEffect(() => {
     getSales();
   }, []);
+
+  useEffect(() => {
+    const filtered = allSales.filter(sale =>
+      sale.folio.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sale.customer?.nombre || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sale.customer?.rfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setDisplayedSales(filtered.slice(startIndex, endIndex));
+  }, [searchQuery, currentPage, allSales]);
+
+  const totalPages = Math.ceil(
+    allSales.filter(sale =>
+      sale.folio.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sale.customer?.nombre || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sale.customer?.rfc || '').toLowerCase().includes(searchQuery.toLowerCase())
+    ).length / itemsPerPage
+  );
 
   const handleViewDetails = (sale) => {
     console.log('Sale selected:', sale);
@@ -56,7 +81,7 @@ const ListSales = () => {
 
     try {
       await salesService.deleteSale(saleId);
-      setSales(sales.filter(s => s._id !== saleId));
+      setAllSales(allSales.filter(s => s._id !== saleId));
       setShowDetails(false);
       setDeleteConfirm(null);
       alert('Venta eliminada exitosamente');
@@ -103,7 +128,27 @@ const ListSales = () => {
         </button>
       </div>
 
-      {sales.length === 0 ? (
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Buscar por folio, cliente o RFC..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1);
+          }}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            fontSize: '14px',
+            borderRadius: '4px',
+            border: '1px solid #ddd',
+            boxSizing: 'border-box'
+          }}
+        />
+      </div>
+
+      {allSales.length === 0 ? (
         <p>No hay ventas registradas</p>
       ) : (
         <div style={{ display: 'grid', gap: '12px' }}>
@@ -121,7 +166,7 @@ const ListSales = () => {
                 </tr>
               </thead>
               <tbody>
-                {sales.map(sale => (
+                {displayedSales.map(sale => (
                   <tr key={sale._id || sale.id} style={{ borderBottom: '1px solid #eee', ':hover': { backgroundColor: '#f9f9f9' } }}>
                     <td style={{ padding: '12px' }}><strong>{sale.folio}</strong></td>
                     <td style={{ padding: '12px' }}>{sale.customer?.nombre || 'N/A'}</td>
@@ -241,6 +286,72 @@ const ListSales = () => {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === 1 ? '#ccc' : '#2c5aa0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                ◀◀ Primera
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === 1 ? '#ccc' : '#2c5aa0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                ◀ Anterior
+              </button>
+
+              <span style={{ margin: '0 8px', fontSize: '14px', fontWeight: '600' }}>
+                Página {currentPage} de {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === totalPages ? '#ccc' : '#2c5aa0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Siguiente ▶
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentPage === totalPages ? '#ccc' : '#2c5aa0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Última ▶▶
+              </button>
+            </div>
+          )}
         </div>
       )}
 
