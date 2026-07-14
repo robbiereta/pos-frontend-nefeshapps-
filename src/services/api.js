@@ -162,11 +162,6 @@ export const invoiceService = {
   },
 };
 
-export const productService = {
-  getProducts: async () => {
-    return request('/api/products');
-  },
-};
 
 export const salesService = {
   createSale: async (saleData) => {

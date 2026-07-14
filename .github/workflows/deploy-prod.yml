@@ -24,7 +24,9 @@ jobs:
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H hetzner >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HETZNER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Build and push Docker image
         run: |
@@ -33,12 +35,12 @@ jobs:
 
       - name: Transfer image to Hetzner
         run: |
-          scp /tmp/frontend-image.tar.gz hetzner:/tmp/
-          scp docker-compose.yml hetzner:/nefeshapps/
+          scp /tmp/frontend-image.tar.gz root@${{ secrets.HETZNER_IP }}:/tmp/
+          scp docker-compose.yml root@${{ secrets.HETZNER_IP }}:/nefeshapps/
 
       - name: Deploy on Hetzner
         run: |
-          ssh hetzner << 'EOF'
+          ssh root@${{ secrets.HETZNER_IP }} << 'EOF'
           set -e
           cd /nefeshapps
           echo "🐳 Stopping existing container..."
