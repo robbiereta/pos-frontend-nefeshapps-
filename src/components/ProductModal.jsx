@@ -8,13 +8,13 @@ export default function ProductModal({ product, onClose, onSave }) {
     sku: '',
     precioUnitario: '',
     precioVenta: '',
-    costoPorUnidad: '',
+    costoPorUnidad: '0',
     cantidad: 0,
     cantidadMinima: '',
     cantidadMaxima: '',
     categoria: '',
     subcategoria: '',
-    unidad: 'Pieza',
+    unidad: '',
     claveUnidad: 'H87',
     claveProdServ: '01010101',
     activo: true,
@@ -170,7 +170,7 @@ export default function ProductModal({ product, onClose, onSave }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Precio Unitario (Compra) *</label>
+              <label>Precio Unitario (Compra) </label>
               <input
                 type="number"
                 name="precioUnitario"
@@ -178,9 +178,7 @@ export default function ProductModal({ product, onClose, onSave }) {
                 onChange={handleChange}
                 step="0.01"
                 min="0"
-                className={errors.precioUnitario ? 'error' : ''}
               />
-              {errors.precioUnitario && <span className="error-text">{errors.precioUnitario}</span>}
             </div>
 
             <div className="form-group">
@@ -250,6 +248,7 @@ export default function ProductModal({ product, onClose, onSave }) {
               <label>Unidad</label>
               <select name="unidad" value={formData.unidad} onChange={handleChange}>
                 <option value="Pieza">Pieza</option>
+                <option value="Servicio">Servicio</option>
                 <option value="Kilogramo">Kilogramo</option>
                 <option value="Litro">Litro</option>
                 <option value="Metro">Metro</option>
@@ -265,7 +264,7 @@ export default function ProductModal({ product, onClose, onSave }) {
                 name="claveUnidad"
                 value={formData.claveUnidad}
                 onChange={handleChange}
-                placeholder="Ej: H87, KGM, LTR"
+                placeholder="Ej: H87,E48, LTR"
                 maxLength="3"
               />
             </div>
