@@ -1,0 +1,43 @@
+/* =====================================================================
+   Components used by Dashboard & other pages.
+   ===================================================================== */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px)  { .kpi-grid { grid-template-columns: 1fr; } }
+
+.kpi { display: flex; flex-direction: column; gap: var(--space-2); }
+.kpi__label { font-size: var(--text-sm); color: var(--neutral-500); font-weight: 500; }
+.kpi__value { font-size: var(--text-3xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--neutral-900); }
+.kpi__hint { margin-top: var(--space-1); }
+
+.invoice-list {
+  display: flex;
+  flex-direction: column;
+}
+.invoice-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 0.8fr 0.8fr;
+  align-items: center;
+  padding: 0.75rem 0.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+.invoice-row:last-child { border-bottom: none; }
+.invoice-row .num { text-align: right; }
+.invoice-row--head {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-500);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+}
+@media (max-width: 720px) {
+  .invoice-row { grid-template-columns: 1.4fr 0.8fr 0.8fr; }
+  .invoice-row > :nth-child(2) { display: none; }
+}
