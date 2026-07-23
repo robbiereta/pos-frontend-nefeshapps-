@@ -1,0 +1,69 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HETZNER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Build and push Docker image
+        run: |
+          docker build -f Dockerfile -t nefeshapps-pos-frontend:latest .
+          docker save nefeshapps-pos-frontend:latest | gzip > /tmp/frontend-image.tar.gz
+
+      - name: Transfer image to Hetzner
+        run: |
+          scp /tmp/frontend-image.tar.gz root@${{ secrets.HETZNER_IP }}:/tmp/
+          scp docker-compose.yml root@${{ secrets.HETZNER_IP }}:/nefeshapps/
+
+      - name: Deploy on Hetzner
+        run: |
+          ssh root@${{ secrets.HETZNER_IP }} << 'EOF'
+          set -e
+          cd /nefeshapps
+          echo "🐳 Stopping existing container..."
+          docker compose down 2>/dev/null || true
+
+          echo "📥 Loading Docker image..."
+          docker load -i /tmp/frontend-image.tar.gz
+
+          echo "🚀 Starting frontend container..."
+          docker compose up -d
+
+          echo "✅ Container running:"
+          docker compose ps
+
+          echo "🧹 Cleanup..."
+          rm -f /tmp/frontend-image.tar.gz
+          EOF
+
+
+      - name: Notify deployment
+        if: success()
+        run: echo "✅ Frontend deployed to production: https://pos.nefeshapps.site"
+
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed"
