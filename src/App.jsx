@@ -12,6 +12,7 @@ import ClientInvoiceWorkflow from './pages/ClientInvoiceWorkflow';
 import SaleToInvoice from './pages/SaleToInvoice';
 import CashDrawer from './pages/CashDrawer';
 import ClientsPage from './pages/ClientsPage';
+import NotasPorCobrar from './pages/NotasPorCobrar';
 import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
@@ -214,6 +215,17 @@ function App() {
               <NavbarModern />
               <main className="main-content">
                 <ClientsPage />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notas-por-cobrar"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <NotasPorCobrar />
               </main>
             </ProtectedRoute>
           }

@@ -1,0 +1,249 @@
+/* =====================================================================
+   Notas por Cobrar
+   ===================================================================== */
+
+.npc-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+  padding: var(--space-5, 1.25rem);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* --- KPIs --- */
+.npc-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4, 1rem);
+}
+@media (max-width: 1100px) {
+  .npc-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .npc-kpi-grid { grid-template-columns: 1fr; }
+}
+
+.kpi-card {
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: 12px;
+  padding: var(--space-4, 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.kpi-card__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-500, #6b7280);
+  font-weight: 600;
+}
+.kpi-card__value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--neutral-900, #111827);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.kpi-card__hint {
+  font-size: 0.8125rem;
+  color: var(--neutral-500, #6b7280);
+}
+.kpi-card--primary { border-left: 3px solid var(--brand-500, #3b82f6); }
+.kpi-card--success { border-left: 3px solid #10b981; }
+.kpi-card--danger  { border-left: 3px solid #ef4444; }
+.kpi-card--info    { border-left: 3px solid #06b6d4; }
+
+/* --- Filters --- */
+.npc-filters {
+  display: grid;
+  grid-template-columns: 1fr 220px auto;
+  gap: var(--space-3, 0.75rem);
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .npc-filters { grid-template-columns: 1fr; }
+}
+
+/* --- Table --- */
+.npc-table-wrapper {
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.npc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.npc-table thead {
+  background: var(--neutral-50, #f9fafb);
+  border-bottom: 1px solid var(--border-subtle, #e5e7eb);
+}
+.npc-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neutral-500, #6b7280);
+  padding: 0.75rem 1rem;
+  white-space: nowrap;
+}
+.npc-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border-subtle, #e5e7eb);
+  vertical-align: middle;
+}
+.npc-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.npc-table tbody tr:hover {
+  background: var(--neutral-50, #f9fafb);
+}
+.npc-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.npc-table--compact th,
+.npc-table--compact td {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+.empty-row {
+  text-align: center;
+  padding: 2.5rem 1rem !important;
+  color: var(--neutral-500, #6b7280);
+}
+
+.cell-strong { font-weight: 600; color: var(--neutral-900, #111827); }
+.cell-muted  { color: var(--neutral-500, #6b7280); font-size: 0.8125rem; }
+.cell-danger { color: #dc2626; font-weight: 600; }
+.cell-success { color: #059669; }
+.cell-truncate {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* --- Badges --- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.badge--neutral { background: #f3f4f6; color: #374151; }
+.badge--info    { background: #dbeafe; color: #1e40af; }
+.badge--success { background: #d1fae5; color: #065f46; }
+.badge--danger  { background: #fee2e2; color: #991b1b; }
+.badge--muted   { background: #e5e7eb; color: #6b7280; }
+
+/* --- Section / Top deudores --- */
+.npc-section h3 {
+  font-size: 1rem;
+  margin-bottom: var(--space-3, 0.75rem);
+  color: var(--neutral-700, #374151);
+}
+.npc-deudores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3, 0.75rem);
+}
+.deudor-card {
+  background: var(--surface-1, #fff);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.deudor-card__name { font-weight: 600; color: var(--neutral-900, #111827); }
+.deudor-card__rfc  { font-size: 0.75rem; color: var(--neutral-500, #6b7280); }
+.deudor-card__amount {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #dc2626;
+  margin-top: 0.25rem;
+}
+.deudor-card__count { font-size: 0.75rem; color: var(--neutral-500, #6b7280); }
+
+/* --- Detail modal --- */
+.modal--lg {
+  max-width: 760px;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-4, 1rem);
+}
+@media (max-width: 600px) {
+  .detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.detail-field__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neutral-500, #6b7280);
+  font-weight: 600;
+}
+.detail-field__value {
+  font-size: 0.9375rem;
+  color: var(--neutral-900, #111827);
+}
+.detail-section {
+  margin-top: var(--space-4, 1rem);
+}
+.detail-section h4 {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neutral-700, #374151);
+  margin-bottom: 0.5rem;
+}
+.detail-section p {
+  color: var(--neutral-700, #374151);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+/* --- Abono info in modal --- */
+.abono-info {
+  background: var(--neutral-50, #f9fafb);
+  border: 1px solid var(--border-subtle, #e5e7eb);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: var(--space-3, 0.75rem);
+  font-size: 0.875rem;
+}
+.abono-info strong { color: var(--neutral-900, #111827); }

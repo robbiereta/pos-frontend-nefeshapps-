@@ -262,3 +262,54 @@ export const clientService = {
     });
   },
 };
+
+export const notasPorCobrarService = {
+  list: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/notas-por-cobrar${query ? `?${query}` : ''}`);
+  },
+  getById: async (id) => {
+    return request(`/api/notas-por-cobrar/${id}`);
+  },
+  create: async (data) => {
+    return request('/api/notas-por-cobrar', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update: async (id, data) => {
+    return request(`/api/notas-por-cobrar/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete: async (id) => {
+    return request(`/api/notas-por-cobrar/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  cancel: async (id, motivo = '') => {
+    return request(`/api/notas-por-cobrar/${id}/cancelar`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo }),
+    });
+  },
+  addAbono: async (id, data) => {
+    return request(`/api/notas-por-cobrar/${id}/abonos`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  removeAbono: async (id, abonoId) => {
+    return request(`/api/notas-por-cobrar/${id}/abonos/${abonoId}`, {
+      method: 'DELETE',
+    });
+  },
+  summary: async (soloVigentes = true) => {
+    return request(`/api/notas-por-cobrar/summary?soloVigentes=${soloVigentes}`);
+  },
+  vencidas: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/notas-por-cobrar/vencidas${query ? `?${query}` : ''}`);
+  },
+};
