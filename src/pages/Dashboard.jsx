@@ -5,6 +5,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { Skeleton, SkeletonStack } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
+import { useToast } from '../components/ui/Toast.jsx';
 
 function formatMoney(n) {
   const v = Number(n) || 0;
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, stamped: 0, pending: 0, totalAmount: 0 });
   const [loading, setLoading] = useState(true);
   const [recentInvoices, setRecentInvoices] = useState([]);
+  const toast = useToast();
 
   useEffect(() => {
     fetchData();
@@ -54,6 +56,7 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error('Error fetching data:', err);
+      toast.error('No se pudieron cargar las facturas');
     } finally {
       setLoading(false);
     }

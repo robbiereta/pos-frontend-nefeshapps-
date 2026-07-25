@@ -2,23 +2,24 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authService } from '../services/api';
 import Button from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast.jsx';
 import '../styles/login.css';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     try {
       await authService.login(email, password);
+      toast.success('Sesión iniciada correctamente');
       window.location.href = '/dashboard';
     } catch (err) {
-      setError(err.message || 'Credenciales inválidas');
+      toast.error(err.message || 'Credenciales inválidas');
     } finally {
       setLoading(false);
     }
@@ -46,8 +47,6 @@ export default function Login() {
         <div className="login-card">
           <h1 className="login-card__title">Bienvenido de vuelta</h1>
           <p className="login-card__subtitle">Inicia sesión para continuar</p>
-
-          {error && <div className="login-error" role="alert">{error}</div>}
 
           <form onSubmit={handleSubmit} className="col" style={{ gap: 16 }}>
             <div>

@@ -10,7 +10,6 @@ const NAV_ITEMS = [
   { path: '/list-sales',   label: 'Ventas',  icon: '💾' },
   { path: '/clients',      label: 'Clientes', icon: '👥' },
   { path: '/invoices',     label: 'Facturas', icon: '📋' },
-  { path: '/notas-por-cobrar', label: 'Notas por Cobrar', icon: '💰' },
   { path: '/cash-drawer',  label: 'Cortes de Caja', icon: '🧾' },
   { path: '/settings',     label: 'Configuración', icon: '⚙️' },
 ];

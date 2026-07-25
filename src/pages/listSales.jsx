@@ -1,6 +1,7 @@
 import { salesService } from '../services/api';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../components/ui/Toast.jsx';
 import './ListSales.css';
 
 const ListSales = () => {
@@ -10,6 +11,7 @@ const ListSales = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSale, setSelectedSale] = useState(null);
+  const toast = useToast();
   const [showDetails, setShowDetails] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +33,7 @@ const ListSales = () => {
     } catch (error) {
       console.error('❌ Error fetching sales:', error);
       setError(error.message || 'Error loading sales');
+      toast.error(error.message || 'Error al cargar ventas');
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { salesService, invoiceService, userService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 
 export default function SaleToInvoice() {
   const location = useLocation();
@@ -13,6 +14,7 @@ export default function SaleToInvoice() {
   const [result, setResult] = useState(null);
   const [progress, setProgress] = useState('');
   const [step, setStep] = useState('list');
+  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
@@ -47,6 +49,7 @@ export default function SaleToInvoice() {
     } catch (err) {
       console.error('Error fetching sales:', err);
       setError('Error al cargar las ventas: ' + err.message);
+      toast.error('Error al cargar las ventas: ' + err.message);
       setSales([]);
     } finally {
       setLoadingSales(false);
@@ -180,6 +183,7 @@ export default function SaleToInvoice() {
     } catch (err) {
       console.error('Conversion error:', err);
       setError(err.message || 'Error al convertir la venta a factura');
+      toast.error(err.message || 'Error al convertir la venta a factura');
       setStep('error');
     } finally {
       setLoading(false);

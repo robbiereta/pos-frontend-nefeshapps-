@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
+import BarcodeSearch from '../components/BarcodeSearch';
+import { useToast } from '../components/ui/Toast.jsx';
 
 const Pos = () => {
   const [cart, setCart] = useState([]);
@@ -25,6 +27,7 @@ const Pos = () => {
   const [paymentForm, setPaymentForm] = useState('01');
   const [loading, setLoading] = useState(false);
   const [emisor, setEmisor] = useState(null);
+  const toast = useToast();
 
   // Fetch products, clients, and emisor config on mount
   useEffect(() => {
@@ -141,6 +144,7 @@ const Pos = () => {
     } catch (err) {
       console.error('Error fetching products:', err);
       setProductsError('Error al cargar productos. Usando catálogo por defecto.');
+      toast.warning('No se pudo cargar el catálogo. Usando productos por defecto.');
       // Fallback to default products
       setProducts([
         {
@@ -203,6 +207,13 @@ const Pos = () => {
 
   // Add item to cart
   const addToCart = (product) => {
+    const existing = cart.find(item => item.id === product.id);
+    if (existing) {
+      toast.success(`+1 ${product.nombre || product.descripcion}`);
+    } else {
+      toast.success(`Agregado: ${product.nombre || product.descripcion}`);
+    }
+
     const existingItem = cart.find(item => item.id === product.id);
     
     if (existingItem) {
@@ -593,6 +604,14 @@ const Pos = () => {
             >
               🔄 Actualizar
             </button>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <BarcodeSearch
+              localProducts={products}
+              onProductFound={(p) => addToCart(p)}
+              onError={(msg) => toast.error(msg)}
+            />
           </div>
 
           {productsError && (

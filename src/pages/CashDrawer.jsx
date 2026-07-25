@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { salesService, cashDrawerService, invoiceService, authService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 
 const PAYMENT_METHODS = {
   '01': 'Efectivo',
@@ -52,6 +53,7 @@ export default function CashDrawer() {
   const [step, setStep] = useState('form'); // form, preview, success
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const toast = useToast();
   const [formData, setFormData] = useState({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
@@ -165,13 +167,13 @@ export default function CashDrawer() {
     try {
       const response = await cashDrawerService.saveCutoff(cutoffData);
       setSavedCutoffId(response?.data?.id || response?._id);
-      alert('✓ Corte de caja guardado exitosamente');
+      toast.success('Corte de caja guardado exitosamente');
       loadCutoffHistory();
       setStep('form');
       setCutoffData(null);
     } catch (err) {
       console.error('Error saving cutoff:', err);
-      alert('Error al guardar el corte: ' + err.message);
+      toast.error('Error al guardar el corte: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -193,12 +195,12 @@ export default function CashDrawer() {
 
   const handleGenerateInvoice = async () => {
     if (!cutoffData || !cutoffData.sales || cutoffData.sales.length === 0) {
-      alert('No hay ventas para facturar');
+      toast.warning('No hay ventas para facturar');
       return;
     }
 
     if (!savedCutoffId) {
-      alert('Debes guardar el corte antes de generar la factura');
+      toast.warning('Debes guardar el corte antes de generar la factura');
       return;
     }
 
@@ -222,11 +224,11 @@ export default function CashDrawer() {
       console.log('⏰ Saved at:', response?.data?.savedAt);
       console.log('📄 UUID:', response?.data?.uuid);
       console.log('💰 Total:', response?.data?.Total);
-      alert('✓ Factura global generada exitosamente\nUUID: ' + response.data?.uuid);
+      toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {
       console.error('Error generating invoice:', err);
-      alert('Error al generar factura: ' + err.message);
+      toast.error('Error al generar factura: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -278,11 +280,11 @@ export default function CashDrawer() {
       console.log('⏰ Saved at:', response?.data?.savedAt);
       console.log('📄 UUID:', response?.data?.uuid);
       console.log('💰 Total:', response?.data?.Total);
-      alert('✓ Factura global generada exitosamente\nUUID: ' + response.data?.uuid);
+      toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {
       console.error('Error generating invoice:', err);
-      alert('Error al generar factura: ' + err.message);
+      toast.error('Error al generar factura: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -296,12 +298,12 @@ export default function CashDrawer() {
     setLoading(true);
     try {
       await cashDrawerService.deleteCutoff(cutoffId);
-      alert('✓ Corte eliminado exitosamente');
+      toast.success('Corte eliminado exitosamente');
       loadCutoffHistory();
       setShowDeleteConfirm(null);
     } catch (err) {
       console.error('Error deleting cutoff:', err);
-      alert('Error al eliminar corte: ' + err.message);
+      toast.error('Error al eliminar corte: ' + err.message);
     } finally {
       setLoading(false);
     }
