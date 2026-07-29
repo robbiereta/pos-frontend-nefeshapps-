@@ -1,0 +1,94 @@
+.piu-root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.piu-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #555;
+}
+
+.piu-dropzone {
+  border: 2px dashed #c0c8d4;
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  color: #5a6675;
+  background: #fafbfc;
+  transition: all 0.15s ease;
+  font-size: 14px;
+}
+.piu-dropzone:hover,
+.piu-dropzone.is-over {
+  border-color: #4f8cff;
+  background: #eef4ff;
+  color: #2d5fc4;
+}
+
+.piu-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.piu-item {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e3e6ea;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+}
+.piu-item.is-principal {
+  border-color: #4f8cff;
+  box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.25);
+}
+.piu-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.piu-actions {
+  position: absolute;
+  inset: auto 4px 4px 4px;
+  display: flex;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+.piu-btn {
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.piu-btn-ghost {
+  background: rgba(255,255,255,0.92);
+  color: #2d5fc4;
+}
+.piu-btn-ghost:hover { background: #fff; }
+.piu-btn-danger {
+  background: rgba(231,76,60,0.92);
+  color: #fff;
+}
+.piu-btn-danger:hover { background: #c0392b; }
+
+.piu-badge {
+  background: #4f8cff;
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+}
