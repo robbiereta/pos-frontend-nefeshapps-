@@ -16,6 +16,8 @@ import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
+import NotesReceivable from './pages/NotesReceivable';
+import NotesPayable from './pages/NotesPayable';
 import NavbarModern from './components/NavbarModern';
 // Keep legacy Navbar available if other modules import it indirectly.
 function Navbar() {
@@ -247,6 +249,28 @@ function App() {
               <NavbarModern />
               <main className="main-content">
                 <Settings />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes-receivable"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <NotesReceivable />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes-payable"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <NotesPayable />
               </main>
             </ProtectedRoute>
           }

@@ -4,14 +4,16 @@ import { authService } from '../services/api';
 import '../styles/navbar.css';
 
 const NAV_ITEMS = [
-  { path: '/pos',          label: 'POS',     icon: '🛒' },
-  { path: '/dashboard',    label: 'Dashboard', icon: '📊' },
-  { path: '/products',     label: 'Productos', icon: '📦' },
-  { path: '/list-sales',   label: 'Ventas',  icon: '💾' },
-  { path: '/clients',      label: 'Clientes', icon: '👥' },
-  { path: '/invoices',     label: 'Facturas', icon: '📋' },
-  { path: '/cash-drawer',  label: 'Cortes de Caja', icon: '🧾' },
-  { path: '/settings',     label: 'Configuración', icon: '⚙️' },
+  { path: '/pos',              label: 'POS',              icon: '🛒' },
+  { path: '/dashboard',        label: 'Dashboard',        icon: '📊' },
+  { path: '/products',         label: 'Productos',        icon: '📦' },
+  { path: '/list-sales',       label: 'Ventas',           icon: '💾' },
+  { path: '/clients',          label: 'Clientes',         icon: '👥' },
+  { path: '/invoices',         label: 'Facturas',         icon: '📋' },
+  { path: '/notes-receivable', label: 'Notas por Cobrar', icon: '💰' },
+  { path: '/notes-payable',    label: 'Notas por Pagar',  icon: '💸' },
+  { path: '/cash-drawer',      label: 'Cortes de Caja',   icon: '🧾' },
+  { path: '/settings',         label: 'Configuración',    icon: '⚙️' },
 ];
 
 function initials(email) {
