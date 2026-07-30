@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
+import { notesService } from '../services/notesService';
 import BarcodeSearch from '../components/BarcodeSearch';
 import { useToast } from '../components/ui/Toast.jsx';
 
@@ -566,12 +567,56 @@ const Pos = () => {
       };
 
       const response = await salesService.createSale(saleData);
+      const saleFolio = response.data?.folio || folio;
+
+      // ──────────────────────────────────────────────────────
+      // Venta a crédito (PPD) → auto-crear nota por cobrar
+      // ──────────────────────────────────────────────────────
+      let noteCreated = null;
+      if (paymentMethod === 'PPD') {
+        try {
+          const today = new Date();
+          const due = new Date();
+          due.setDate(today.getDate() + 30);
+          const todayISO = today.toISOString().split('T')[0];
+          const dueISO = due.toISOString().split('T')[0];
+
+          const useCatalogClient = selectedClientId && selectedClientId !== 'default';
+          const notePayload = {
+            type: 'receivable',
+            concept: `Venta a crédito - ${saleFolio}`,
+            description: `Venta generada desde POS. Folio venta: ${saleFolio}.`,
+            amount: total,
+            issueDate: todayISO,
+            dueDate: dueISO,
+            notes: `Auto-generada desde venta ${saleFolio}.`,
+          };
+          if (useCatalogClient) {
+            notePayload.clienteId = selectedClientId;
+          } else {
+            // Snapshot libre desde el cliente del POS
+            notePayload.contactName = customer.nombre || 'PUBLICO EN GENERAL';
+            notePayload.contactRfc = customer.rfc || 'XAXX010101000';
+            notePayload.contactEmail = customer.email || '';
+            notePayload.contactPhone = '';
+          }
+
+          noteCreated = await notesService.createNote(notePayload);
+          toast.success(`Nota por cobrar creada: ${noteCreated.folio}`);
+        } catch (noteErr) {
+          console.error('Error creando nota por cobrar:', noteErr);
+          toast.error(`Venta OK, pero no se pudo crear la nota: ${noteErr.message}`);
+        }
+      }
 
       // Generate and print thermal receipt
-      const receiptHTML = generateThermalReceipt(saleData, response.data?.folio || folio);
+      const receiptHTML = generateThermalReceipt(saleData, saleFolio);
       printThermalReceipt(receiptHTML);
 
-      alert(`Venta procesada exitosamente!\nFolio: ${response.data?.folio || folio}\nTotal: $${total.toFixed(2)}`);
+      const extraMsg = noteCreated
+        ? `\nNota por cobrar: ${noteCreated.folio}`
+        : '';
+      alert(`Venta procesada exitosamente!\nFolio: ${saleFolio}\nTotal: $${total.toFixed(2)}${extraMsg}`);
       clearCart();
 
     } catch (error) {
