@@ -132,3 +132,6 @@ export const productService = {
     });
   },
 };
+
+// Expose internal request helper for sibling services (e.g. images)
+productService.request = request;
