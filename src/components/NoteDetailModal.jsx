@@ -39,19 +39,20 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [timbrando, setTimbrando] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     if (open && note?._id) {
       loadPayments();
     }
-  }, [open, note?._id]);
+  }, [open, note?._id, note?.type]);
 
   const loadPayments = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await notesService.getPayments(note._id);
+      const data = await notesService.getPayments(note._id, note.type);
       setPayments(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message || 'Error al cargar abonos');
@@ -64,7 +65,7 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
     if (!confirm('¿Eliminar este abono? El saldo pendiente se actualizará.')) return;
     setDeletingId(paymentId);
     try {
-      await notesService.deletePayment(note._id, paymentId);
+      await notesService.deletePayment(note._id, paymentId, note.type);
       toast.success('Abono eliminado');
       await loadPayments();
       if (onChanged) onChanged();
@@ -72,6 +73,28 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
       toast.error(err.message || 'Error al eliminar');
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleTimbrarPPD = async () => {
+    if (!confirm(
+      `¿Timbrar CFDI PPD por $${Number(note.amount || 0).toFixed(2)}?\n\n` +
+      `Esto consumirá un folio del PAC y no se puede deshacer.`
+    )) return;
+    setTimbrando(true);
+    try {
+      const { note: updated, invoice } = await notesService.timbrarPPD(note._id, { type: note.type });
+      toast.success(`CFDI timbrado: ${updated.invoiceUuid}`);
+      // refrescar padre para que la lista muestre el UUID
+      if (onChanged) await onChanged();
+      // actualizar la nota local para que el modal muestre el UUID
+      Object.assign(note, updated);
+      // forzar re-render: recargar pagos
+      await loadPayments();
+    } catch (err) {
+      toast.error(err.message || 'Error al timbrar CFDI');
+    } finally {
+      setTimbrando(false);
     }
   };
 
@@ -91,13 +114,51 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
           <button type="button" className="notes-modal-close" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            {note.folio && (
+              <div style={{
+                fontFamily: 'monospace',
+                fontSize: '0.75rem',
+                color: 'var(--gray-500, #6b7280)',
+                marginBottom: '0.15rem',
+                letterSpacing: '0.5px',
+              }}>
+                Folio: <strong style={{ color: 'var(--gray-700, #374151)' }}>{note.folio}</strong>
+              </div>
+            )}
             <div style={{ fontSize: '0.8rem', color: 'var(--gray-500, #6b7280)' }}>Concepto</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{note.concept}</div>
             {note.reference && <div style={{ fontSize: '0.8rem', color: 'var(--gray-500, #6b7280)' }}>Ref: {note.reference}</div>}
+            {note.invoiceUuid && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500, #6b7280)', marginTop: '0.2rem' }}>
+                CFDI: <span style={{ fontFamily: 'monospace' }}>{note.invoiceUuid}</span>
+              </div>
+            )}
           </div>
-          <span className={`notes-badge ${statusClass}`}>{statusLabel}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {note.type === 'receivable' && !note.invoiceUuid && note.status !== 'cancelled' && note.status !== 'paid' && (
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '0.4rem 0.75rem',
+                  background: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  cursor: timbrando ? 'wait' : 'pointer',
+                  opacity: timbrando ? 0.7 : 1,
+                }}
+                onClick={handleTimbrarPPD}
+                disabled={timbrando}
+                title="Genera un CFDI 4.0 PPD (Pago en Parcialidades o Diferido) vinculado a esta nota y lo liga al UUID"
+              >
+                {timbrando ? '⏳ Timbrando…' : '🧾 Timbrar CFDI PPD'}
+              </button>
+            )}
+            <span className={`notes-badge ${statusClass}`}>{statusLabel}</span>
+          </div>
         </div>
 
         <div className="notes-detail-grid">

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { clientService } from '../services/api';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 const addDays = (iso, days) => {
@@ -8,6 +9,7 @@ const addDays = (iso, days) => {
 };
 
 const emptyForm = () => ({
+  clienteId: '',
   contactName: '',
   contactRfc: '',
   reference: '',
@@ -32,11 +34,15 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       if (initial) {
         setForm({
+          clienteId: initial.clienteId || '',
           contactName: initial.contactName || '',
           contactRfc: initial.contactRfc || '',
           reference: initial.reference || '',
@@ -50,14 +56,54 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
         setForm(emptyForm());
       }
       setError(null);
+      setClientSearch('');
     }
   }, [open, initial]);
+
+  // Cargar clientes al abrir (solo para CxC; las CxP no usan esta lógica)
+  useEffect(() => {
+    if (!open || type !== 'receivable') return;
+    let cancelled = false;
+    (async () => {
+      setLoadingClients(true);
+      try {
+        const res = await clientService.getAllClients({ limit: 500, page: 1 });
+        if (!cancelled) setClients(res.data || []);
+      } catch (e) {
+        // No es fatal: el usuario puede capturar manualmente
+        if (!cancelled) setClients([]);
+      } finally {
+        if (!cancelled) setLoadingClients(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, type]);
 
   if (!open) return null;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Cambia el cliente seleccionado: autollena nombre y RFC
+  const handleClientPick = (e) => {
+    const value = e.target.value;
+    if (value === '__free__') {
+      setForm(prev => ({ ...prev, clienteId: '', contactName: '', contactRfc: '' }));
+    } else if (value === '') {
+      setForm(prev => ({ ...prev, clienteId: '' }));
+    } else {
+      const c = clients.find(x => x._id === value);
+      if (c) {
+        setForm(prev => ({
+          ...prev,
+          clienteId: c._id,
+          contactName: c.nombre || '',
+          contactRfc: c.rfc || '',
+        }));
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -86,6 +132,7 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
     try {
       const payload = {
         type,
+        clienteId: form.clienteId || undefined,
         contactName: form.contactName.trim(),
         contactRfc: form.contactRfc.trim() || undefined,
         reference: form.reference.trim() || undefined,
@@ -108,6 +155,23 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
     ? (type === 'receivable' ? 'Editar Nota por Cobrar' : 'Editar Nota por Pagar')
     : (type === 'receivable' ? 'Nueva Nota por Cobrar' : 'Nueva Nota por Pagar');
 
+  // Lista filtrada por la búsqueda del usuario
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients.slice(0, 100);
+    const q = clientSearch.toLowerCase();
+    return clients
+      .filter(c =>
+        (c.nombre || '').toLowerCase().includes(q) ||
+        (c.rfc || '').toLowerCase().includes(q)
+      )
+      .slice(0, 100);
+  }, [clients, clientSearch]);
+
+  // Helper: si hay cliente seleccionado, mostrar su info
+  const selectedClient = form.clienteId
+    ? clients.find(c => c._id === form.clienteId)
+    : null;
+
   return (
     <div className="notes-modal-backdrop" onClick={onClose}>
       <div className="notes-modal" onClick={(e) => e.stopPropagation()}>
@@ -123,6 +187,46 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
         )}
 
         <form onSubmit={handleSubmit}>
+          {/* Picker de cliente (solo CxC) */}
+          {type === 'receivable' && (
+            <div className="notes-form-row full">
+              <div className="form-group">
+                <label>{initial ? 'Cliente' : 'Cliente (catálogo)'} </label>
+                {loadingClients ? (
+                  <div style={{ padding: '0.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                    Cargando clientes...
+                  </div>
+                ) : clients.length > 0 ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar por nombre o RFC..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      style={{ marginBottom: '0.4rem' }}
+                    />
+                    <select
+                      value={form.clienteId || (initial ? '' : '__free__')}
+                      onChange={handleClientPick}
+                    >
+                      {!initial && <option value="__free__">— Texto libre (sin cliente del catálogo) —</option>}
+                      {initial && !selectedClient && <option value="">— Sin cliente —</option>}
+                      {filteredClients.map(c => (
+                        <option key={c._id} value={c._id}>
+                          {c.nombre} {c.rfc ? `(${c.rfc})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <div style={{ padding: '0.4rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                    Sin clientes en el catálogo. Captura los datos abajo.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="notes-form-row">
             <div className="form-group">
               <label>{type === 'receivable' ? 'Cliente *' : 'Proveedor *'}</label>
@@ -131,6 +235,8 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                 value={form.contactName}
                 onChange={handleChange}
                 placeholder="Nombre o razón social"
+                readOnly={!!selectedClient}
+                style={selectedClient ? { background: 'var(--gray-100, #f3f4f6)' } : undefined}
                 required
               />
             </div>
@@ -142,6 +248,8 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                 onChange={handleChange}
                 placeholder="XAXX010101000"
                 maxLength={13}
+                readOnly={!!selectedClient}
+                style={selectedClient ? { background: 'var(--gray-100, #f3f4f6)' } : undefined}
               />
             </div>
           </div>
@@ -153,8 +261,13 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                 name="reference"
                 value={form.reference}
                 onChange={handleChange}
-                placeholder="FACT-123, orden de compra, etc."
+                placeholder={initial?.folio ? `Folio actual: ${initial.folio}` : 'FACT-123, orden de compra, etc.'}
               />
+              {initial?.folio && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
+                  Folio generado por el sistema: <strong>{initial.folio}</strong> (no editable)
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label>Monto *</label>

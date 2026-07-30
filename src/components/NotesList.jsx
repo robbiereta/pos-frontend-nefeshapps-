@@ -96,7 +96,8 @@ export default function NotesList({ type, title }) {
       (n.contactName || '').toLowerCase().includes(q) ||
       (n.contactRfc || '').toLowerCase().includes(q) ||
       (n.reference || '').toLowerCase().includes(q) ||
-      (n.concept || '').toLowerCase().includes(q)
+      (n.concept || '').toLowerCase().includes(q) ||
+      (n.folio || '').toLowerCase().includes(q)
     );
   }, [notes, searchQuery]);
 
@@ -137,7 +138,7 @@ export default function NotesList({ type, title }) {
   const handleCancel = async (note) => {
     if (!confirm(`¿Cancelar la nota "${note.concept}"? Esta acción no se puede deshacer.`)) return;
     try {
-      await notesService.cancelNote(note._id);
+      await notesService.cancelNote(note._id, 'Cancelada desde POS', note.type || type);
       toast.success('Nota cancelada');
       await loadNotes();
     } catch (err) {
@@ -146,11 +147,12 @@ export default function NotesList({ type, title }) {
   };
 
   const handleAddPayment = async (paymentData) => {
-    await notesService.addPayment(paymentNote._id, paymentData);
+    const noteType = paymentNote.type || type;
+    await notesService.addPayment(paymentNote._id, paymentData, noteType);
     toast.success('Abono registrado');
     // Refrescar detalle si está abierto
     if (detailNote && detailNote._id === paymentNote._id) {
-      const updated = await notesService.getNoteById(paymentNote._id);
+      const updated = await notesService.getNoteById(paymentNote._id, noteType);
       setDetailNote(updated);
     }
     await loadNotes();
@@ -244,6 +246,7 @@ export default function NotesList({ type, title }) {
               <table className="notes-table">
                 <thead>
                   <tr>
+                    <th>Folio</th>
                     <th>{isReceivable ? 'Cliente' : 'Proveedor'}</th>
                     <th>Concepto</th>
                     <th>Emisión</th>
@@ -260,6 +263,9 @@ export default function NotesList({ type, title }) {
                     const overdue = balance > 0 && daysOverdue(n.dueDate) > 0 && n.status !== 'cancelled';
                     return (
                       <tr key={n._id} className={overdue ? 'overdue-row' : ''}>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
+                          {n.folio || '—'}
+                        </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{n.contactName}</div>
                           {n.contactRfc && (
