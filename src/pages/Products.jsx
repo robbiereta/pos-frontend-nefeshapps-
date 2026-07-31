@@ -3,6 +3,7 @@ import { productService } from '../services/productService';
 import ProductModal from '../components/ProductModal';
 import QuantityModal from '../components/QuantityModal';
 import BarcodeSearch from '../components/BarcodeSearch';
+import ImportProductsModal from '../components/ImportProductsModal';
 import { useToast } from '../components/ui/Toast.jsx';
 import './Products.css';
 
@@ -34,6 +35,7 @@ export default function Products() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Inventory Stats
@@ -246,9 +248,18 @@ export default function Products() {
     <div className="products-page">
       <div className="page-header">
         <h1>Gestión de Productos</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-          + Nuevo Producto
-        </button>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowImportModal(true)}
+            title="Importar productos desde Excel o CSV"
+          >
+            📥 Importar
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            + Nuevo Producto
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -539,6 +550,18 @@ export default function Products() {
             setSelectedProduct(null);
           }}
           onSave={handleUpdateQuantity}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportProductsModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {
+            // Refrescar la lista tras importar
+            fetchProducts();
+            fetchStats();
+            fetchLowStock();
+          }}
         />
       )}
     </div>
