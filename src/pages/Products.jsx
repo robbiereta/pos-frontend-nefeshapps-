@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { productService } from '../services/productService';
 import ProductModal from '../components/ProductModal';
 import QuantityModal from '../components/QuantityModal';
+import BarcodeSearch from '../components/BarcodeSearch';
+import ImportProductsModal from '../components/ImportProductsModal';
+import { useToast } from '../components/ui/Toast.jsx';
 import './Products.css';
 
 export default function Products() {
@@ -32,6 +35,7 @@ export default function Products() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Inventory Stats
@@ -40,6 +44,7 @@ export default function Products() {
 
   // Bulk selection
   const [selectedProducts, setSelectedProducts] = useState([]);
+  const toast = useToast();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -101,7 +106,9 @@ export default function Products() {
       console.error('❌ Error in fetchProducts:', err);
       console.error('❌ Error message:', err.message);
       console.error('❌ Error stack:', err.stack);
-      setError(err.message || 'Error al cargar productos');
+      const msg = err.message || 'Error al cargar productos';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -130,29 +137,25 @@ export default function Products() {
   const handleCreate = async (productData) => {
     try {
       await productService.createProduct(productData);
-      setSuccess('Producto creado exitosamente');
+      toast.success('Producto creado exitosamente');
       setShowCreateModal(false);
       fetchProducts();
       fetchStats();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || 'Error al crear producto');
-      setTimeout(() => setError(null), 3000);
+      toast.error(err.message || 'Error al crear producto');
     }
   };
 
   const handleEdit = async (productData) => {
     try {
       await productService.updateProduct(selectedProduct._id, productData);
-      setSuccess('Producto actualizado exitosamente');
+      toast.success('Producto actualizado exitosamente');
       setShowEditModal(false);
       setSelectedProduct(null);
       fetchProducts();
       fetchStats();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || 'Error al actualizar producto');
-      setTimeout(() => setError(null), 3000);
+      toast.error(err.message || 'Error al actualizar producto');
     }
   };
 
@@ -161,47 +164,40 @@ export default function Products() {
 
     try {
       await productService.deleteProduct(productId);
-      setSuccess('Producto eliminado exitosamente');
+      toast.success('Producto eliminado exitosamente');
       fetchProducts();
       fetchStats();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || 'Error al eliminar producto');
-      setTimeout(() => setError(null), 3000);
+      toast.error(err.message || 'Error al eliminar producto');
     }
   };
 
   const handleUpdateQuantity = async (operacion, cantidad) => {
     try {
       await productService.updateQuantity(selectedProduct._id, operacion, cantidad);
-      setSuccess('Cantidad actualizada exitosamente');
+      toast.success('Cantidad actualizada exitosamente');
       setShowQuantityModal(false);
       setSelectedProduct(null);
       fetchProducts();
       fetchStats();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || 'Error al actualizar cantidad');
-      setTimeout(() => setError(null), 3000);
+      toast.error(err.message || 'Error al actualizar cantidad');
     }
   };
 
   const handleBulkUpdate = async (updates) => {
     if (selectedProducts.length === 0) {
-      setError('Seleccione al menos un producto');
-      setTimeout(() => setError(null), 3000);
+      toast.warning('Seleccione al menos un producto');
       return;
     }
 
     try {
       await productService.bulkUpdate(selectedProducts, updates);
-      setSuccess(`${selectedProducts.length} productos actualizados exitosamente`);
+      toast.success(`${selectedProducts.length} productos actualizados exitosamente`);
       setSelectedProducts([]);
       fetchProducts();
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err.message || 'Error al actualizar productos');
-      setTimeout(() => setError(null), 3000);
+      toast.error(err.message || 'Error al actualizar productos');
     }
   };
 
@@ -252,9 +248,18 @@ export default function Products() {
     <div className="products-page">
       <div className="page-header">
         <h1>Gestión de Productos</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-          + Nuevo Producto
-        </button>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowImportModal(true)}
+            title="Importar productos desde Excel o CSV"
+          >
+            📥 Importar
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            + Nuevo Producto
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -299,6 +304,17 @@ export default function Products() {
           </div>
         </div>
       )}
+
+      {/* Quick barcode/SKU search — instant, local filter */}
+      <div className="card" style={{ marginBottom: '12px' }}>
+        <BarcodeSearch
+          localProducts={products}
+          onProductFound={(p) => {
+            setSelectedProduct(p);
+            setShowEditModal(true);
+          }}
+        />
+      </div>
 
       {/* Filters */}
       <div className="card filters-card">
@@ -534,6 +550,18 @@ export default function Products() {
             setSelectedProduct(null);
           }}
           onSave={handleUpdateQuantity}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportProductsModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {
+            // Refrescar la lista tras importar
+            fetchProducts();
+            fetchStats();
+            fetchLowStock();
+          }}
         />
       )}
     </div>

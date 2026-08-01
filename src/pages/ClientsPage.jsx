@@ -68,14 +68,17 @@ export default function ClientsPage() {
       setLoading(true);
       if (editingId) {
         await clientService.updateClient(editingId, formData);
+        toast.success('Cliente actualizado');
       } else {
         await clientService.createClient(formData);
+        toast.success('Cliente creado');
       }
       await loadClients();
       resetForm();
       setShowForm(false);
     } catch (err) {
       setError(err.message);
+      toast.error(err.message || 'Error al guardar cliente');
     } finally {
       setLoading(false);
     }
@@ -104,9 +107,11 @@ export default function ClientsPage() {
       try {
         setLoading(true);
         await clientService.deleteClient(id);
+        toast.success('Cliente eliminado');
         await loadClients();
       } catch (err) {
         setError(err.message);
+        toast.error(err.message || 'Error al eliminar cliente');
       } finally {
         setLoading(false);
       }

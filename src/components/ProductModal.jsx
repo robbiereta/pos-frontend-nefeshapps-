@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ProductImageUpload from './ProductImageUpload';
 import './Modal.css';
 
 export default function ProductModal({ product, onClose, onSave }) {
@@ -308,6 +309,13 @@ export default function ProductModal({ product, onClose, onSave }) {
               <span>Producto activo</span>
             </label>
           </div>
+
+          {product?._id && (
+            <ProductImageUpload
+              productId={product._id}
+              imagenes={product.imagenes || []}
+            />
+          )}
 
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>

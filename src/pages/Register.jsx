@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { authService } from '../services/api';
 import { Link } from 'react-router-dom';
+import { useToast } from '../components/ui/Toast.jsx';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+  const toast = useToast();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -57,6 +59,7 @@ export default function Register() {
       });
 
       setSuccess('Registro exitoso. Redirigiendo al dashboard...');
+      toast.success('Registro exitoso');
 
       // Auto-login después del registro
       if (response.data?.accessToken) {
@@ -70,6 +73,7 @@ export default function Register() {
       }
     } catch (err) {
       setError(err.message || 'Error al registrar. Por favor intenta de nuevo.');
+      toast.error(err.message || 'Error al registrar');
     } finally {
       setLoading(false);
     }

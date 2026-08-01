@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoiceService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 
 const formatDate = (dateStr) => {
   try {
@@ -19,6 +20,7 @@ export default function InvoiceList() {
   const [displayedInvoices, setDisplayedInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const toast = useToast();
   const [filters, setFilters] = useState({
     fechaInicio: '',
     fechaFin: '',
@@ -53,6 +55,7 @@ export default function InvoiceList() {
       setInvoices(response.data || response || []);
     } catch (err) {
       setError('Error al cargar las facturas');
+      toast.error('Error al cargar las facturas');
       console.error(err);
     } finally {
       setLoading(false);

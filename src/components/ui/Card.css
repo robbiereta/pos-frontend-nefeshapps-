@@ -1,0 +1,32 @@
+.card-modern {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--duration-base) var(--ease-standard);
+}
+.card-modern--elevated { box-shadow: var(--shadow-md); }
+.card-modern--pad-sm { padding: var(--space-4); }
+.card-modern--pad-md { padding: var(--space-6); }
+.card-modern--pad-lg { padding: var(--space-8); }
+.card-modern--pad-none { padding: 0; }
+
+.card-modern__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.card-modern__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--neutral-900);
+  letter-spacing: var(--tracking-tight);
+}
+.card-modern__subtitle {
+  font-size: var(--text-sm);
+  color: var(--neutral-500);
+  margin-top: var(--space-1);
+}
+.card-modern__action { flex-shrink: 0; }

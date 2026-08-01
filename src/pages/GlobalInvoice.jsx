@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { invoiceService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 
 export default function GlobalInvoice() {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ export default function GlobalInvoice() {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const toast = useToast();
 
   const handleChange = (e) => {
     setFormData({
@@ -33,8 +35,10 @@ export default function GlobalInvoice() {
       
       setMessage('Factura generada correctamente');
       setResult(response);
+      toast.success('Factura generada correctamente');
     } catch (err) {
       setError(err.response?.data?.message || 'Error al generar la factura');
+      toast.error(err.response?.data?.message || 'Error al generar la factura');
     } finally {
       setLoading(false);
     }

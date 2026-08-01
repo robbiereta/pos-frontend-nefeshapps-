@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 import './Settings.css';
 
 export default function Settings() {
@@ -7,6 +8,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const toast = useToast();
 
   // User profile state
   const [user, setUser] = useState(null);
@@ -93,6 +95,7 @@ export default function Settings() {
       }
     } catch (err) {
       setError('Error cargando información del usuario');
+      toast.error('Error cargando información del usuario');
     } finally {
       setLoading(false);
     }
@@ -131,10 +134,12 @@ export default function Settings() {
       });
 
       setSuccess('Perfil actualizado correctamente');
+      toast.success('Perfil actualizado correctamente');
       setTimeout(() => setSuccess(''), 3000);
       loadUserData();
     } catch (err) {
       setError(err.message || 'Error actualizando perfil');
+      toast.error(err.message || 'Error actualizando perfil');
     } finally {
       setLoading(false);
     }

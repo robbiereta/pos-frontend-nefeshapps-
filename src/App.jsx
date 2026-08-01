@@ -16,6 +16,10 @@ import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
+import NotesReceivable from './pages/NotesReceivable';
+import NotesPayable from './pages/NotesPayable';
+import NavbarModern from './components/NavbarModern';
+// Keep legacy Navbar available if other modules import it indirectly.
 function Navbar() {
   const [isOpen, setIsOpen] = React.useState(false);
   const location = useLocation();
@@ -110,7 +114,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <Dashboard />
               </main>
@@ -121,7 +125,7 @@ function App() {
           path="/pos"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <Pos />
               </main>
@@ -132,7 +136,7 @@ function App() {
           path="/global-invoice"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <GlobalInvoice />
               </main>
@@ -143,7 +147,7 @@ function App() {
           path="/invoices"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <InvoiceList />
               </main>
@@ -154,7 +158,7 @@ function App() {
           path="/client-invoice"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <ClientInvoice />
               </main>
@@ -165,7 +169,7 @@ function App() {
           path="/client-invoice-workflow"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <ClientInvoiceWorkflow />
               </main>
@@ -176,7 +180,7 @@ function App() {
           path="/sale-to-invoice"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <SaleToInvoice />
               </main>
@@ -187,7 +191,7 @@ function App() {
           path="/list-sales"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <ListSales />
               </main>
@@ -198,7 +202,7 @@ function App() {
           path="/cash-drawer"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <CashDrawer />
               </main>
@@ -209,7 +213,7 @@ function App() {
           path="/clients"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <ClientsPage />
               </main>
@@ -220,7 +224,7 @@ function App() {
           path="/api-test"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <ApiTest />
               </main>
@@ -231,7 +235,7 @@ function App() {
           path="/products"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <Products />
               </main>
@@ -242,9 +246,31 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <Navbar />
+              <NavbarModern />
               <main className="main-content">
                 <Settings />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes-receivable"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <NotesReceivable />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes-payable"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <NotesPayable />
               </main>
             </ProtectedRoute>
           }
