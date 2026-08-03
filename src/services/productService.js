@@ -131,4 +131,38 @@ export const productService = {
       body: JSON.stringify({ productIds, updates }),
     });
   },
+
+  // Upload products from Excel/CSV (multipart/form-data, field 'file').
+  // Uses fetch directly because request() sets Content-Type: application/json
+  // which conflicts with FormData's auto-generated multipart boundary.
+  // Still reuses the auth pattern (Bearer token) and 401 redirect.
+  uploadExcel: async (file, { skipValidation = false } = {}) => {
+    const token = localStorage.getItem('token');
+    const fd = new FormData();
+    fd.append('file', file);
+    const qs = skipValidation ? '?skipValidation=true' : '';
+    const res = await fetch(`${API_URL}/api/products/upload-excel${qs}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // Backend returns details: [...] for validation errors, or error: 'NO_FILE' / etc.
+      const msg = data.message || data.error || `Error ${res.status}`;
+      const details = Array.isArray(data.details) ? data.details : [];
+      const err = new Error(msg);
+      err.status = res.status;
+      err.details = details;
+      err.payload = data;
+      throw err;
+    }
+    return data;
+  },
 };
