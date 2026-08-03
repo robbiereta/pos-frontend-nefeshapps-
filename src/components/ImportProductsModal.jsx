@@ -4,8 +4,6 @@ import { useToast } from './ui/Toast.jsx';
 import './Modal.css';
 import './ImportProductsModal.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002';
-
 const TEMPLATE_COLUMNS = [
   'nombre', 'descripcion', 'sku', 'claveProdServ',
   'precioUnitario', 'precioVenta', 'costoPorUnidad',
@@ -17,14 +15,36 @@ const TEMPLATE_COLUMNS = [
   'proveedor_nombre', 'proveedor_contacto', 'proveedor_email', 'proveedor_telefono',
 ];
 
+// CSV row helper: escape a field if it contains comma, quote, or newline.
+const csvField = (v) => {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+const SAMPLE_ROW = [
+  'Coca Cola 600ml', 'Refresco de cola', 'COK600', '50202201',
+  18.5, 22, 10, 'Pieza', 'H87',
+  100, 10, 500, 'Bebidas', 'Refrescos', 'cola;gaseosa',
+  '02', 0.16, 0, true, 'Línea de prueba',
+  'Proveedor oficial', '', '', '',
+];
+
 export default function ImportProductsModal({ onClose, onSuccess }) {
   const [file, setFile] = useState(null);
   const [skipValidation, setSkipValidation] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
+  const [errorList, setErrorList] = useState([]);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef(null);
   const toast = useToast();
+
+  const reset = () => {
+    setResult(null);
+    setErrorList([]);
+    setErrorMessage(null);
+  };
 
   const handleSelect = (f) => {
     if (!f) return;
@@ -37,7 +57,7 @@ export default function ImportProductsModal({ onClose, onSuccess }) {
       return;
     }
     setFile(f);
-    setResult(null);
+    reset();
   };
 
   const handleSubmit = async () => {
@@ -46,34 +66,43 @@ export default function ImportProductsModal({ onClose, onSuccess }) {
       return;
     }
     setUploading(true);
+    reset();
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const qs = skipValidation ? '?skipValidation=true' : '';
-      const res = await fetch(`${API_URL}/api/products/upload-excel${qs}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: fd,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.message || data.error || `Error ${res.status}`);
-      }
-      setResult(data);
-      toast?.success?.(`Importación completada: ${data.inserted || data.created?.length || 0} productos`);
+      const data = await productService.uploadExcel(file, { skipValidation });
+      // Backend success shape:
+      //   { success: true, message, data: { uploaded, failed, products:[{nombre,id,row}], errors? } }
+      const inner = data?.data || {};
+      const uploaded = inner.uploaded ?? inner.products?.length ?? 0;
+      const failed = inner.failed ?? 0;
+      const list = Array.isArray(inner.errors) ? inner.errors : [];
+      setResult({ uploaded, failed, products: inner.products || [], errors: list });
+      toast?.success?.(
+        failed > 0
+          ? `Importación parcial: ${uploaded} OK, ${failed} con error`
+          : `Importación completada: ${uploaded} productos`
+      );
       onSuccess?.(data);
     } catch (err) {
-      toast?.error?.(err.message);
+      // Validation error: 400 with { success:false, message, details:[strings] }
+      if (err.details?.length) {
+        setErrorList(err.details);
+        setErrorMessage(err.message);
+        toast?.error?.(`${err.message} (${err.details.length} errores)`);
+      } else {
+        setErrorMessage(err.message);
+        toast?.error?.(err.message);
+      }
     } finally {
       setUploading(false);
     }
   };
 
   const downloadTemplate = () => {
-    // CSV simple con encabezados para que el usuario lo llene
-    const sample = TEMPLATE_COLUMNS.join(',') + '\n' +
-      'Coca Cola 600ml,Refresco de cola,COK600,50202201,18.50,22,,Pieza,H87,100,10,500,Bebidas,Refrescos,cola;gaseosa,02,0.16,0,true,Proveedor oficial,,,\n';
-    const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+    const csv =
+      TEMPLATE_COLUMNS.join(',') + '\n' +
+      SAMPLE_ROW.map(csvField).join(',') + '\n';
+    // BOM so Excel detects UTF-8 correctly
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -81,11 +110,6 @@ export default function ImportProductsModal({ onClose, onSuccess }) {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const errors = result?.errors || [];
-  const inserted = result?.inserted ?? result?.created?.length ?? result?.summary?.inserted ?? 0;
-  const updated = result?.updated ?? result?.summary?.updated ?? 0;
-  const skipped = result?.skipped ?? result?.summary?.skipped ?? 0;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -97,8 +121,8 @@ export default function ImportProductsModal({ onClose, onSuccess }) {
 
         <div className="modal-body">
           <p className="import-hint">
-            Sube un archivo <code>.xlsx</code>, <code>.xls</code> o <code>.csv</code> con las columnas del modelo de producto (ver plantilla).
-            Máximo 5MB.
+            Sube un archivo <code>.xlsx</code>, <code>.xls</code> o <code>.csv</code> con las columnas
+            del modelo de producto (ver plantilla). Máximo 5MB.
           </p>
 
           <div className="import-actions-row">
@@ -141,22 +165,54 @@ export default function ImportProductsModal({ onClose, onSuccess }) {
           </label>
 
           {result && (
-            <div className={`import-result ${errors.length ? 'has-errors' : 'ok'}`}>
+            <div className={`import-result ${result.failed > 0 ? 'has-errors' : 'ok'}`}>
               <h3>Resultado</h3>
               <ul className="import-stats">
-                <li>✅ Insertados: <strong>{inserted}</strong></li>
-                <li>🔄 Actualizados: <strong>{updated}</strong></li>
-                <li>⏭️ Omitidos: <strong>{skipped}</strong></li>
-                <li>❌ Errores: <strong>{errors.length}</strong></li>
+                <li>✅ Insertados: <strong>{result.uploaded}</strong></li>
+                <li>❌ Fallidos: <strong>{result.failed}</strong></li>
               </ul>
-              {errors.length > 0 && (
+              {result.products?.length > 0 && (
                 <details className="import-errors" open>
-                  <summary>Ver errores ({errors.length})</summary>
+                  <summary>Productos creados ({result.products.length})</summary>
                   <ul>
-                    {errors.slice(0, 50).map((e, i) => (
-                      <li key={i}>{typeof e === 'string' ? e : (e.message || JSON.stringify(e))}</li>
+                    {result.products.slice(0, 50).map((p) => (
+                      <li key={p.id}>
+                        Fila {p.row}: <strong>{p.nombre}</strong>
+                        <span className="muted"> · {String(p.id).slice(-8)}</span>
+                      </li>
                     ))}
-                    {errors.length > 50 && <li>… y {errors.length - 50} más</li>}
+                    {result.products.length > 50 && (
+                      <li>… y {result.products.length - 50} más</li>
+                    )}
+                  </ul>
+                </details>
+              )}
+              {result.errors?.length > 0 && (
+                <details className="import-errors" open>
+                  <summary>Errores por fila ({result.errors.length})</summary>
+                  <ul>
+                    {result.errors.slice(0, 50).map((e, i) => (
+                      <li key={i}>
+                        Fila {e.row} {e.nombre ? `· ${e.nombre}` : ''}: {e.error}
+                      </li>
+                    ))}
+                    {result.errors.length > 50 && (
+                      <li>… y {result.errors.length - 50} más</li>
+                    )}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+
+          {errorMessage && !result && (
+            <div className="import-result has-errors">
+              <h3>❌ {errorMessage}</h3>
+              {errorList.length > 0 && (
+                <details className="import-errors" open>
+                  <summary>Detalle ({errorList.length})</summary>
+                  <ul>
+                    {errorList.map((e, i) => <li key={i}>{e}</li>)}
                   </ul>
                 </details>
               )}
