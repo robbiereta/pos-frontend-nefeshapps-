@@ -224,7 +224,8 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
           ) : payments.length === 0 ? (
             <div className="empty">No hay abonos registrados</div>
           ) : (
-            <table>
+            <div className="notes-payments-list-wrapper">
+              <table>
               <thead>
                 <tr style={{ background: 'var(--gray-50, #f9fafb)' }}>
                   <th>Fecha</th>
@@ -258,6 +259,7 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
                 ))}
               </tbody>
             </table>
+            </div>
           )}
 
           {payments.length > 0 && (

@@ -242,7 +242,7 @@ export default function NotesList({ type, title }) {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="notes-table-wrapper">
               <table className="notes-table">
                 <thead>
                   <tr>
