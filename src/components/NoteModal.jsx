@@ -181,8 +181,8 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
         </div>
 
         {error && (
-          <div style={{ background: '#fee2e2', color: '#991b1b', padding: '0.6rem 0.85rem', borderRadius: 6, marginBottom: '1rem', fontSize: '0.9rem' }}>
-            {error}
+          <div style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '0.85rem 1rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.9rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+            ⚠️ {error}
           </div>
         )}
 

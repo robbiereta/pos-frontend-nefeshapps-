@@ -214,8 +214,8 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
           </div>
 
           {error && (
-            <div style={{ padding: '0.75rem 1rem', color: '#991b1b', background: '#fee2e2', fontSize: '0.85rem' }}>
-              {error}
+            <div style={{ padding: '0.85rem 1rem', color: '#991b1b', background: 'linear-gradient(to right, #fee2e2, #fecaca)', fontSize: '0.9rem', borderRadius: 8, marginBottom: '1rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+              ⚠️ {error}
             </div>
           )}
 

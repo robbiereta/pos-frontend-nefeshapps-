@@ -172,8 +172,8 @@ export default function NotesList({ type, title }) {
       </div>
 
       {error && (
-        <div className="error-banner" style={{ background: '#fee2e2', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: 6, marginBottom: '1rem' }}>
-          {error}
+        <div className="error-banner" style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '1rem', borderRadius: 8, marginBottom: '1.25rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+          ⚠️ {error}
         </div>
       )}
 
