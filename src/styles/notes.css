@@ -54,6 +54,22 @@
   transform: translateY(-2px);
 }
 
+/* ─── Generic Card ─── */
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--gray-100, #f3f4f6);
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--gray-200, #e5e7eb);
+}
+
 .notes-tabs {
   display: flex;
   gap: 0.5rem;
@@ -439,6 +455,13 @@
 .notes-table tbody tr:nth-child(5) { animation-delay: 120ms; }
 .notes-table tbody tr:nth-child(n+6) { animation-delay: 150ms; }
 
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* ─── Modal genérico ─── */
 .notes-modal-backdrop {
   position: fixed;
@@ -579,6 +602,15 @@
   border-color: var(--primary-color, #3b82f6);
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
   background: rgba(59, 130, 246, 0.02);
+}
+
+.notes-form-row .form-group input:disabled,
+.notes-form-row .form-group select:disabled,
+.notes-form-row .form-group textarea:disabled {
+  background: var(--gray-50, #f9fafb);
+  color: var(--gray-500, #6b7280);
+  cursor: not-allowed;
+  border-color: var(--gray-200, #e5e7eb);
 }
 
 .notes-form-actions {
