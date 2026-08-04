@@ -55,11 +55,6 @@ export const productService = {
   getProducts: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const endpoint = `/api/products${query ? `?${query}` : ''}`;
-    console.log('🟢 productService.getProducts called');
-    console.log('🟢 API_URL:', API_URL);
-    console.log('🟢 Endpoint:', endpoint);
-    console.log('🟢 Full URL:', `${API_URL}${endpoint}`);
-    console.log('🟢 Token exists:', !!localStorage.getItem('token'));
     return request(endpoint);
   },
 

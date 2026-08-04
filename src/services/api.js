@@ -140,8 +140,6 @@ export const invoiceService = {
       payload = { invoiceJson: invoiceJsonOrXmlOrUuid };
     }
 
-    console.log('📤 PDF Request Payload:', payload);
-
     return fetch(`${API_URL}/api/invoices/pdf`, {
       method: 'POST',
       headers: {
@@ -150,10 +148,8 @@ export const invoiceService = {
       },
       body: JSON.stringify(payload)
     }).then(response => {
-      console.log('📥 PDF Response Status:', response.status);
       if (response.ok) {
         return response.blob().then(blob => {
-          console.log('✅ PDF Blob received:', { size: blob.size, type: blob.type });
           return URL.createObjectURL(blob);
         });
       }

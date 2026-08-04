@@ -56,7 +56,6 @@ export default function InvoiceList() {
     } catch (err) {
       setError('Error al cargar las facturas');
       toast.error('Error al cargar las facturas');
-      console.error(err);
     } finally {
       setLoading(false);
     }

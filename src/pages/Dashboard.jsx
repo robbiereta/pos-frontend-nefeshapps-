@@ -55,7 +55,6 @@ export default function Dashboard() {
         totalAmount: invoices.reduce((s, i) => s + (Number(i.total) || 0), 0),
       });
     } catch (err) {
-      console.error('Error fetching data:', err);
       toast.error('No se pudieron cargar las facturas');
     } finally {
       setLoading(false);

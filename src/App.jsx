@@ -39,6 +39,8 @@ function Navbar() {
     { path: '/list-sales', label: 'Ventas', icon: '💾' },
     { path: '/clients', label: 'Clientes', icon: '👥' },
     { path: '/invoices', label: 'Facturas', icon: '📋' },
+    { path: '/notes-receivable', label: 'Notas por Cobrar', icon: '💳' },
+    { path: '/notes-payable', label: 'Notas por Pagar', icon: '💰' },
     { path: '/cash-drawer', label: 'Cortes de Caja', icon: '➕' },
     { path: '/settings', label: 'Configuracion', icon: '⚙️' },
   ];

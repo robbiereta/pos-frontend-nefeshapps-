@@ -13,11 +13,6 @@ export default function Products() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
-  // Log when products state changes
-  useEffect(() => {
-    console.log('🔴 Products state changed:', products.length, 'items');
-    console.log('🔴 Products:', products);
-  }, [products]);
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -63,7 +58,6 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      console.log('🔵 fetchProducts called');
       setLoading(true);
       setError(null);
 
@@ -76,36 +70,20 @@ export default function Products() {
       if (categoryFilter) params.categoria = categoryFilter;
       if (statusFilter) params.activo = statusFilter;
 
-      console.log('🔵 Calling API with params:', params);
-      console.log('🔵 productService:', productService);
-      console.log('🔵 About to call productService.getProducts...');
-
       const response = await productService.getProducts(params);
-
-      console.log('🔵 AFTER productService call');
-      console.log('🔵 API Response:', response);
-      console.log('🔵 Response.data:', response.data);
-      console.log('🔵 Response.data.products:', response.data?.products);
 
       // Backend returns: { success: true, data: { products: [...], pagination: {...} } }
       const productsList = response.data?.products || [];
-      console.log('🔵 Products list length:', productsList.length);
-      console.log('🔵 Products list:', productsList);
       const pagination = response.data?.pagination || {};
 
-      console.log('🟡 Setting products to state:', productsList.length, 'items');
       setProducts(productsList);
       setTotalPages(pagination.pages || 1);
       setTotal(pagination.total || 0);
-      console.log('🟡 State updated');
 
       // Extract unique categories
       const uniqueCategories = [...new Set(productsList.map(p => p.categoria).filter(Boolean))];
       setCategories(uniqueCategories);
     } catch (err) {
-      console.error('❌ Error in fetchProducts:', err);
-      console.error('❌ Error message:', err.message);
-      console.error('❌ Error stack:', err.stack);
       const msg = err.message || 'Error al cargar productos';
       setError(msg);
       toast.error(msg);
@@ -120,7 +98,7 @@ export default function Products() {
       const statsData = response.data?.stats || response.data || {};
       setStats(statsData);
     } catch (err) {
-      console.error('Error fetching stats:', err);
+      // Silent error
     }
   };
 
@@ -130,7 +108,7 @@ export default function Products() {
       const lowStockData = response.data?.products || response.data || [];
       setLowStockProducts(lowStockData);
     } catch (err) {
-      console.error('Error fetching low stock:', err);
+      // Silent error
     }
   };
 
@@ -386,10 +364,6 @@ export default function Products() {
 
       {/* Products Table */}
       <div className="card">
-        {(() => {
-          console.log('🟣 Render check - loading:', loading, 'products.length:', products.length);
-          return null;
-        })()}
         {loading ? (
           <div className="loading">Cargando productos...</div>
         ) : products.length === 0 ? (

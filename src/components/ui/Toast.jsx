@@ -82,8 +82,8 @@ export function useToast() {
   if (!ctx) {
     // Soft fallback so components don't crash if a provider is missing
     return {
-      show: console.log, success: console.log, error: console.warn,
-      warning: console.log, info: console.log, dismiss: () => {},
+      show: () => {}, success: () => {}, error: () => {},
+      warning: () => {}, info: () => {}, dismiss: () => {},
     };
   }
   return ctx;

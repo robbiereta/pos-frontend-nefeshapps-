@@ -43,7 +43,6 @@ const Pos = () => {
       const response = await clientService.getAllClients({ limit: 100 });
       setClients(response.data?.clients || response.data || []);
     } catch (err) {
-      console.error('Error fetching clients:', err);
       setClients([]);
     } finally {
       setLoadingClients(false);
@@ -55,7 +54,7 @@ const Pos = () => {
       const config = await userService.getEmisorConfig();
       setEmisor(config?.data || null);
     } catch (err) {
-      console.error('Error fetching emisor config:', err);
+      // Silent error
     }
   };
 
@@ -143,7 +142,6 @@ const Pos = () => {
 
       setProducts(posProducts);
     } catch (err) {
-      console.error('Error fetching products:', err);
       setProductsError('Error al cargar productos. Usando catálogo por defecto.');
       toast.warning('No se pudo cargar el catálogo. Usando productos por defecto.');
       // Fallback to default products
@@ -569,9 +567,6 @@ const Pos = () => {
       const response = await salesService.createSale(saleData);
       const saleFolio = response.data?.folio || folio;
 
-      // ──────────────────────────────────────────────────────
-      // Venta a crédito (PPD) → auto-crear nota por cobrar
-      // ──────────────────────────────────────────────────────
       let noteCreated = null;
       if (paymentMethod === 'PPD') {
         try {
@@ -594,7 +589,6 @@ const Pos = () => {
           if (useCatalogClient) {
             notePayload.clienteId = selectedClientId;
           } else {
-            // Snapshot libre desde el cliente del POS
             notePayload.contactName = customer.nombre || 'PUBLICO EN GENERAL';
             notePayload.contactRfc = customer.rfc || 'XAXX010101000';
             notePayload.contactEmail = customer.email || '';
@@ -604,7 +598,6 @@ const Pos = () => {
           noteCreated = await notesService.createNote(notePayload);
           toast.success(`Nota por cobrar creada: ${noteCreated.folio}`);
         } catch (noteErr) {
-          console.error('Error creando nota por cobrar:', noteErr);
           toast.error(`Venta OK, pero no se pudo crear la nota: ${noteErr.message}`);
         }
       }
@@ -620,7 +613,6 @@ const Pos = () => {
       clearCart();
 
     } catch (error) {
-      console.error('Error processing sale:', error);
       alert('Error al procesar la venta: ' + error.message);
     } finally {
       setLoading(false);
