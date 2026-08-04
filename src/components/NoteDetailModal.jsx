@@ -142,17 +142,33 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
                 type="button"
                 className="btn"
                 style={{
-                  fontSize: '0.78rem',
-                  padding: '0.4rem 0.75rem',
-                  background: '#2563eb',
+                  fontSize: '0.8rem',
+                  padding: '0.5rem 1rem',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   color: 'white',
                   border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 600,
                   cursor: timbrando ? 'wait' : 'pointer',
                   opacity: timbrando ? 0.7 : 1,
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                  transition: 'all 0.3s ease',
                 }}
                 onClick={handleTimbrarPPD}
                 disabled={timbrando}
                 title="Genera un CFDI 4.0 PPD (Pago en Parcialidades o Diferido) vinculado a esta nota y lo liga al UUID"
+                onMouseEnter={(e) => {
+                  if (!timbrando) {
+                    e.target.style.boxShadow = '0 6px 16px rgba(37, 99, 235, 0.4)';
+                    e.target.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!timbrando) {
+                    e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                    e.target.style.transform = 'translateY(0)';
+                  }
+                }}
               >
                 {timbrando ? '⏳ Timbrando…' : '🧾 Timbrar CFDI PPD'}
               </button>
@@ -205,8 +221,16 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
               <button
                 type="button"
                 className="btn btn-primary"
-                style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
+                style={{ fontSize: '0.8rem', padding: '0.5rem 1rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)', transition: 'all 0.2s', cursor: 'pointer' }}
                 onClick={onAddPayment}
+                onMouseEnter={(e) => {
+                  e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                  e.target.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.2)';
+                  e.target.style.transform = 'translateY(0)';
+                }}
               >
                 + Registrar abono
               </button>
@@ -244,15 +268,27 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>
                       ${Number(p.amount || 0).toFixed(2)}
                     </td>
-                    <td>
+                    <td style={{ textAlign: 'center' }}>
                       <button
                         type="button"
                         className="btn btn-sm"
-                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: '#dc2626' }}
+                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', transition: 'all 0.2s', cursor: deletingId === p._id ? 'wait' : 'pointer', opacity: deletingId === p._id ? 0.6 : 1 }}
                         onClick={() => handleDeletePayment(p._id)}
                         disabled={deletingId === p._id}
+                        onMouseEnter={(e) => {
+                          if (deletingId !== p._id) {
+                            e.target.style.background = '#fee2e2';
+                            e.target.style.borderColor = '#dc2626';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (deletingId !== p._id) {
+                            e.target.style.background = 'white';
+                            e.target.style.borderColor = '#fca5a5';
+                          }
+                        }}
                       >
-                        {deletingId === p._id ? '...' : '🗑'}
+                        {deletingId === p._id ? '⏳' : '🗑'}
                       </button>
                     </td>
                   </tr>

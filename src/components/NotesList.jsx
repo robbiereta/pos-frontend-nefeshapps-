@@ -300,9 +300,19 @@ export default function NotesList({ type, title }) {
                           <div className="actions-cell">
                             <button
                               className="btn btn-sm"
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                              style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
                               onClick={() => setDetailNote(n)}
                               title="Ver detalle"
+                              onMouseEnter={(e) => {
+                                e.target.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                                e.target.style.color = 'white';
+                                e.target.style.borderColor = '#3b82f6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = 'white';
+                                e.target.style.color = '#1f2937';
+                                e.target.style.borderColor = '#e5e7eb';
+                              }}
                             >
                               👁
                             </button>
@@ -310,17 +320,35 @@ export default function NotesList({ type, title }) {
                               <>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#10b981', color: 'white' }}
+                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', borderRadius: '6px', border: 'none', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)' }}
                                   onClick={() => setPaymentNote(n)}
                                   title="Registrar abono"
+                                  onMouseEnter={(e) => {
+                                    e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                                    e.target.style.transform = 'translateY(-2px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.2)';
+                                    e.target.style.transform = 'translateY(0)';
+                                  }}
                                 >
                                   💵
                                 </button>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
                                   onClick={() => { setEditingNote(n); setShowForm(true); }}
                                   title="Editar"
+                                  onMouseEnter={(e) => {
+                                    e.target.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                                    e.target.style.color = 'white';
+                                    e.target.style.borderColor = '#f59e0b';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.background = 'white';
+                                    e.target.style.color = '#1f2937';
+                                    e.target.style.borderColor = '#e5e7eb';
+                                  }}
                                 >
                                   ✏️
                                 </button>
@@ -329,9 +357,17 @@ export default function NotesList({ type, title }) {
                             {n.status !== 'cancelled' && (
                               <button
                                 className="btn btn-sm"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
+                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', transition: 'all 0.2s' }}
                                 onClick={() => handleCancel(n)}
                                 title="Cancelar nota"
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = '#fee2e2';
+                                  e.target.style.borderColor = '#dc2626';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = 'white';
+                                  e.target.style.borderColor = '#fca5a5';
+                                }}
                               >
                                 ✕
                               </button>
