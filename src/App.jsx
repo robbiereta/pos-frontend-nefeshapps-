@@ -16,6 +16,7 @@ import Pos from './pages/Pos';
 import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
+import Cotizaciones from './pages/Cotizaciones';
 import NotesReceivable from './pages/NotesReceivable';
 import NotesPayable from './pages/NotesPayable';
 import NavbarModern from './components/NavbarModern';
@@ -36,6 +37,7 @@ function Navbar() {
     { path: '/pos', label: 'POS', icon: '🛒', primary: true },
     { path: '/dashboard', label: 'Dashboard', icon: '📊', primary: true },
     { path: '/products', label: 'Productos', icon: '📦' },
+    { path: '/cotizaciones', label: 'Cotizaciones', icon: '📋' },
     { path: '/list-sales', label: 'Ventas', icon: '💾' },
     { path: '/clients', label: 'Clientes', icon: '👥' },
     { path: '/invoices', label: 'Facturas', icon: '📋' },
@@ -240,6 +242,17 @@ function App() {
               <NavbarModern />
               <main className="main-content">
                 <Products />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cotizaciones"
+          element={
+            <ProtectedRoute>
+              <NavbarModern />
+              <main className="main-content">
+                <Cotizaciones />
               </main>
             </ProtectedRoute>
           }
