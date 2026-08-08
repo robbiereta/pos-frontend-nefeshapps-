@@ -1,0 +1,13 @@
+[Unit]
+Description=Run deploy-watcher every 30 seconds
+
+[Timer]
+# Cada 30 segundos, con una ventana de 5s para no spamear el API
+OnUnitActiveSec=30s
+AccuracySec=5s
+# Que arranque apenas se inicia el sistema
+Persistent=true
+Unit=deploy-watcher.service
+
+[Install]
+WantedBy=timers.target

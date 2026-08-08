@@ -1,0 +1,91 @@
+name: Deploy to Staging (Hetzner API + git pull)
+
+# Deploy v3: sin registry, sin webhook, sin SSH.
+#
+# Flujo:
+#   1. CI (este workflow) hace un PATCH al server vía Hetzner Cloud
+#      API para setear el label `deploy-sha` con el short SHA del
+#      commit. Una sola llamada HTTP, sin build, sin push, sin
+#      artifacts.
+#   2. Un systemd timer en el server (deploy-watcher.timer) corre
+#      cada 30s un script (deploy-watcher.sh) que lee el label,
+#      y si cambió desde la última corrida, hace `git pull` +
+#      `docker compose up -d --build` en /opt/app/pos-frontend.
+#
+# El server es self-deploying. La CI solo le da la señal.
+#
+# Requisitos (una vez, de tu lado):
+#  1. Clonar el repo en el server: `git clone <repo> /opt/app/pos-frontend`
+#  2. Crear un Hetzner Cloud API token: console → Security → API
+#     Tokens → Generate. (formato `hc_...`).
+#  3. Anotar el ID del server: console → Servers → click en el
+#     server → copiar el ID numérico.
+#  4. Subir los archivos de deploy/ al server y activar el timer:
+#       sudo cp deploy-watcher.sh /opt/deploy-watcher/watcher.sh
+#       sudo cp deploy-watcher.{service,timer} /etc/systemd/system/
+#       sudo cp deploy.env.example /etc/hetzner/deploy.env
+#       sudo $EDITOR /etc/hetzner/deploy.env   # pegar HCLOUD_TOKEN
+#       sudo systemctl daemon-reload
+#       sudo systemctl enable --now deploy-watcher.timer
+#  5. En GitHub, agregar 2 secrets al repo:
+#       HCLOUD_TOKEN      = hc_xxxxxxxxxxxxx (mismo que el server)
+#       HCLOUD_SERVER_ID  = <id numérico del server>
+#  6. Copiar este archivo a `.github/workflows/deploy-staging-api.yml`
+#     (manual: el bot no puede pushear a .github/workflows/ por el
+#     scope del PAT).
+
+on:
+  push:
+    branches: [Staging]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-api
+  cancel-in-progress: true
+
+jobs:
+  trigger:
+    name: Update server label via Hetzner API
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Set deploy-sha label on the server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_ID: ${{ secrets.HCLOUD_SERVER_ID }}
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          echo "🔔 Setting deploy-sha=$SHORT on server $SERVER_ID"
+
+          response=$(curl -sS -w "\n%{http_code}" -X PATCH \
+            "https://api.hetzner.cloud/v1/servers/${SERVER_ID}" \
+            -H "Authorization: Bearer ${HCLOUD_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"labels\":{\"deploy-sha\":\"${SHORT}\"}}")
+
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "→ HTTP $http_code"
+          echo "$body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Hetzner API returned non-200"
+            exit 1
+          fi
+
+          {
+            echo "## 🚀 Staging deploy triggered"
+            echo "- Service: pos-frontend (staging)"
+            echo "- deploy-sha: \`${SHORT}\`"
+            echo "- Commit: ${GITHUB_SHA}"
+            echo ""
+            echo "El server detectará el cambio en su label en los"
+            echo "próximos 30s y va a hacer \`git pull\` + \`docker compose up\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "## 🚨 Staging deploy trigger failed" >> "$GITHUB_STEP_SUMMARY"
