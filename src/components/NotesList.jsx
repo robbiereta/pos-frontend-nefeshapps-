@@ -58,9 +58,14 @@ export default function NotesList({ type, title }) {
 
   const isReceivable = type === 'receivable';
 
+  // Un solo useEffect para que la lista no se cargue dos veces en el
+  // mount (antes había dos useEffect, uno por [type] y otro por
+  // [statusFilter]; al montar type=inicial y statusFilter='' disparaban
+  // los dos con la misma query).
   useEffect(() => {
     loadNotes();
-  }, [type]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, statusFilter]);
 
   const loadNotes = async () => {
     setLoading(true);
@@ -82,23 +87,27 @@ export default function NotesList({ type, title }) {
     }
   };
 
-  // Refrescar al cambiar filtro de estado
-  useEffect(() => {
-    loadNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  // ─── Filtro + paginación client-side ───
+  // ─── Filtro + orden + paginación client-side ───
+  // El backend ordena por fechaVencimiento ASC; en UI priorizamos notas
+  // vencidas (vencidas → pendientes → pagadas/canceladas) y dentro de
+  // cada grupo por fechaVencimiento ASC para que lo más urgente quede
+  // arriba, sin importar la paginación.
   const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes;
-    const q = searchQuery.toLowerCase();
-    return notes.filter(n =>
-      (n.contactName || '').toLowerCase().includes(q) ||
-      (n.contactRfc || '').toLowerCase().includes(q) ||
-      (n.reference || '').toLowerCase().includes(q) ||
-      (n.concept || '').toLowerCase().includes(q) ||
-      (n.folio || '').toLowerCase().includes(q)
+    const matched = !searchQuery ? notes : notes.filter(n =>
+      (n.contactName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.contactRfc || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.reference || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.concept || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.folio || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
+    return [...matched].sort((a, b) => {
+      const aOverdue = a.status !== 'paid' && a.status !== 'cancelled' && daysOverdue(a.dueDate) > 0;
+      const bOverdue = b.status !== 'paid' && b.status !== 'cancelled' && daysOverdue(b.dueDate) > 0;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // vencidas primero
+      const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return av - bv; // fechaVencimiento ASC
+    });
   }, [notes, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredNotes.length / itemsPerPage));
