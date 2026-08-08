@@ -32,9 +32,7 @@ export default function SaleToInvoice() {
     try {
       setLoadingSales(true);
       setError(null);
-      console.log('Fetching sales...');
       const data = await salesService.getAllSales({ limit: 100, page: 1 });
-      console.log('Sales data received:', data);
 
       let salesArray = [];
       if (Array.isArray(data)) {
@@ -44,10 +42,8 @@ export default function SaleToInvoice() {
         salesArray = data.sales || data.items || Object.values(data).find(v => Array.isArray(v)) || [];
       }
 
-      console.log('Parsed sales:', salesArray);
       setSales(salesArray);
     } catch (err) {
-      console.error('Error fetching sales:', err);
       setError('Error al cargar las ventas: ' + err.message);
       toast.error('Error al cargar las ventas: ' + err.message);
       setSales([]);

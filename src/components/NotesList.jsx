@@ -58,9 +58,14 @@ export default function NotesList({ type, title }) {
 
   const isReceivable = type === 'receivable';
 
+  // Un solo useEffect para que la lista no se cargue dos veces en el
+  // mount (antes había dos useEffect, uno por [type] y otro por
+  // [statusFilter]; al montar type=inicial y statusFilter='' disparaban
+  // los dos con la misma query).
   useEffect(() => {
     loadNotes();
-  }, [type]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, statusFilter]);
 
   const loadNotes = async () => {
     setLoading(true);
@@ -82,23 +87,27 @@ export default function NotesList({ type, title }) {
     }
   };
 
-  // Refrescar al cambiar filtro de estado
-  useEffect(() => {
-    loadNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  // ─── Filtro + paginación client-side ───
+  // ─── Filtro + orden + paginación client-side ───
+  // El backend ordena por fechaVencimiento ASC; en UI priorizamos notas
+  // vencidas (vencidas → pendientes → pagadas/canceladas) y dentro de
+  // cada grupo por fechaVencimiento ASC para que lo más urgente quede
+  // arriba, sin importar la paginación.
   const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes;
-    const q = searchQuery.toLowerCase();
-    return notes.filter(n =>
-      (n.contactName || '').toLowerCase().includes(q) ||
-      (n.contactRfc || '').toLowerCase().includes(q) ||
-      (n.reference || '').toLowerCase().includes(q) ||
-      (n.concept || '').toLowerCase().includes(q) ||
-      (n.folio || '').toLowerCase().includes(q)
+    const matched = !searchQuery ? notes : notes.filter(n =>
+      (n.contactName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.contactRfc || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.reference || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.concept || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (n.folio || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
+    return [...matched].sort((a, b) => {
+      const aOverdue = a.status !== 'paid' && a.status !== 'cancelled' && daysOverdue(a.dueDate) > 0;
+      const bOverdue = b.status !== 'paid' && b.status !== 'cancelled' && daysOverdue(b.dueDate) > 0;
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // vencidas primero
+      const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return av - bv; // fechaVencimiento ASC
+    });
   }, [notes, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredNotes.length / itemsPerPage));
@@ -172,8 +181,8 @@ export default function NotesList({ type, title }) {
       </div>
 
       {error && (
-        <div className="error-banner" style={{ background: '#fee2e2', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: 6, marginBottom: '1rem' }}>
-          {error}
+        <div className="error-banner" style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '1rem', borderRadius: 8, marginBottom: '1.25rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+          ⚠️ {error}
         </div>
       )}
 
@@ -242,7 +251,7 @@ export default function NotesList({ type, title }) {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="notes-table-wrapper">
               <table className="notes-table">
                 <thead>
                   <tr>
@@ -300,9 +309,19 @@ export default function NotesList({ type, title }) {
                           <div className="actions-cell">
                             <button
                               className="btn btn-sm"
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                              style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
                               onClick={() => setDetailNote(n)}
                               title="Ver detalle"
+                              onMouseEnter={(e) => {
+                                e.target.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                                e.target.style.color = 'white';
+                                e.target.style.borderColor = '#3b82f6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.background = 'white';
+                                e.target.style.color = '#1f2937';
+                                e.target.style.borderColor = '#e5e7eb';
+                              }}
                             >
                               👁
                             </button>
@@ -310,17 +329,35 @@ export default function NotesList({ type, title }) {
                               <>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#10b981', color: 'white' }}
+                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', borderRadius: '6px', border: 'none', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)' }}
                                   onClick={() => setPaymentNote(n)}
                                   title="Registrar abono"
+                                  onMouseEnter={(e) => {
+                                    e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                                    e.target.style.transform = 'translateY(-2px)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.2)';
+                                    e.target.style.transform = 'translateY(0)';
+                                  }}
                                 >
                                   💵
                                 </button>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
                                   onClick={() => { setEditingNote(n); setShowForm(true); }}
                                   title="Editar"
+                                  onMouseEnter={(e) => {
+                                    e.target.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                                    e.target.style.color = 'white';
+                                    e.target.style.borderColor = '#f59e0b';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.target.style.background = 'white';
+                                    e.target.style.color = '#1f2937';
+                                    e.target.style.borderColor = '#e5e7eb';
+                                  }}
                                 >
                                   ✏️
                                 </button>
@@ -329,9 +366,17 @@ export default function NotesList({ type, title }) {
                             {n.status !== 'cancelled' && (
                               <button
                                 className="btn btn-sm"
-                                style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', color: '#dc2626' }}
+                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', transition: 'all 0.2s' }}
                                 onClick={() => handleCancel(n)}
                                 title="Cancelar nota"
+                                onMouseEnter={(e) => {
+                                  e.target.style.background = '#fee2e2';
+                                  e.target.style.borderColor = '#dc2626';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.background = 'white';
+                                  e.target.style.borderColor = '#fca5a5';
+                                }}
                               >
                                 ✕
                               </button>

@@ -140,8 +140,6 @@ export const invoiceService = {
       payload = { invoiceJson: invoiceJsonOrXmlOrUuid };
     }
 
-    console.log('📤 PDF Request Payload:', payload);
-
     return fetch(`${API_URL}/api/invoices/pdf`, {
       method: 'POST',
       headers: {
@@ -150,10 +148,8 @@ export const invoiceService = {
       },
       body: JSON.stringify(payload)
     }).then(response => {
-      console.log('📥 PDF Response Status:', response.status);
       if (response.ok) {
         return response.blob().then(blob => {
-          console.log('✅ PDF Blob received:', { size: blob.size, type: blob.type });
           return URL.createObjectURL(blob);
         });
       }
@@ -260,5 +256,72 @@ export const clientService = {
     return request(`/api/clients/${id}`, {
       method: 'DELETE',
     });
+  },
+};
+
+export const notasPorCobrarService = {
+  list: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/notas-por-cobrar${query ? `?${query}` : ''}`);
+  },
+  getById: async (id) => {
+    return request(`/api/notas-por-cobrar/${id}`);
+  },
+  create: async (data) => {
+    return request('/api/notas-por-cobrar', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update: async (id, data) => {
+    return request(`/api/notas-por-cobrar/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  delete: async (id) => {
+    return request(`/api/notas-por-cobrar/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  cancel: async (id, motivo = '') => {
+    return request(`/api/notas-por-cobrar/${id}/cancelar`, {
+      method: 'POST',
+      body: JSON.stringify({ motivo }),
+    });
+  },
+  addAbono: async (id, data) => {
+    return request(`/api/notas-por-cobrar/${id}/abonos`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  removeAbono: async (id, abonoId) => {
+    return request(`/api/notas-por-cobrar/${id}/abonos/${abonoId}`, {
+      method: 'DELETE',
+    });
+  },
+  summary: async (soloVigentes = true) => {
+    return request(`/api/notas-por-cobrar/summary?soloVigentes=${soloVigentes}`);
+  },
+  vencidas: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/notas-por-cobrar/vencidas${query ? `?${query}` : ''}`);
+  },
+};
+
+export const pagoService = {
+  create: async (data) => {
+    return request('/api/pagos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  list: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/api/pagos${query ? `?${query}` : ''}`);
+  },
+  getById: async (id) => {
+    return request(`/api/pagos/${id}`);
   },
 };

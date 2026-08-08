@@ -96,32 +96,32 @@ export default function PaymentModal({ open, onClose, onSave, note }) {
           <button type="button" className="notes-modal-close" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
 
-        <div style={{ background: 'var(--blue-50, #eff6ff)', padding: '0.85rem 1rem', borderRadius: 6, marginBottom: '1rem', fontSize: '0.9rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-            <span>Contacto:</span>
-            <strong>{note.contactName}</strong>
+        <div style={{ background: 'linear-gradient(to right, #dbeafe, #eff6ff)', padding: '1rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.9rem', border: '1px solid #93c5fd' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 600, color: '#1e40af' }}>Contacto:</span>
+            <strong style={{ color: '#1e3a8a' }}>{note.contactName}</strong>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-            <span>Concepto:</span>
-            <span>{note.concept}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 600, color: '#1e40af' }}>Concepto:</span>
+            <span style={{ color: '#374151' }}>{note.concept}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-            <span>Monto original:</span>
-            <span>${Number(note.amount || 0).toFixed(2)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 600, color: '#1e40af' }}>Monto original:</span>
+            <span style={{ color: '#374151' }}>${Number(note.amount || 0).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-            <span>Abonado:</span>
-            <span>${Number(note.paidAmount || 0).toFixed(2)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 600, color: '#1e40af' }}>Abonado:</span>
+            <span style={{ color: '#10b981' }}>${Number(note.paidAmount || 0).toFixed(2)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--gray-300, #d1d5db)', paddingTop: '0.4rem', marginTop: '0.4rem' }}>
-            <strong>Saldo pendiente:</strong>
-            <strong style={{ color: '#ef4444' }}>${balance.toFixed(2)}</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #93c5fd', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+            <strong style={{ color: '#1e3a8a' }}>Saldo pendiente:</strong>
+            <strong style={{ color: '#dc2626', fontSize: '1.05rem' }}>${balance.toFixed(2)}</strong>
           </div>
         </div>
 
         {error && (
-          <div style={{ background: '#fee2e2', color: '#991b1b', padding: '0.6rem 0.85rem', borderRadius: 6, marginBottom: '1rem', fontSize: '0.9rem' }}>
-            {error}
+          <div style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '0.85rem 1rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.9rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+            ⚠️ {error}
           </div>
         )}
 
@@ -139,11 +139,11 @@ export default function PaymentModal({ open, onClose, onSave, note }) {
                 onChange={handleChange}
                 required
               />
-              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-                <button type="button" className="btn" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }} onClick={() => setQuickAmount(0.25)}>25%</button>
-                <button type="button" className="btn" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }} onClick={() => setQuickAmount(0.5)}>50%</button>
-                <button type="button" className="btn" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }} onClick={() => setQuickAmount(0.75)}>75%</button>
-                <button type="button" className="btn" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }} onClick={() => setQuickAmount(1)}>100%</button>
+              <div className="quick-buttons">
+                <button type="button" className="btn" onClick={() => setQuickAmount(0.25)}>25%</button>
+                <button type="button" className="btn" onClick={() => setQuickAmount(0.5)}>50%</button>
+                <button type="button" className="btn" onClick={() => setQuickAmount(0.75)}>75%</button>
+                <button type="button" className="btn" onClick={() => setQuickAmount(1)}>100%</button>
               </div>
             </div>
             <div className="form-group">

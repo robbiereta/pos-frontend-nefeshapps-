@@ -91,7 +91,6 @@ export default function Settings() {
         }
       } catch (err) {
         // Emisor config no existe aún, es opcional
-        console.log('Emisor config not found, will create new one');
       }
     } catch (err) {
       setError('Error cargando información del usuario');

@@ -198,7 +198,7 @@ export default function ClientInvoiceWorkflow() {
       try {
         pdfResponse = await invoiceService.generatePDF(JSON.stringify(invoiceData.data));
       } catch (pdfErr) {
-        console.warn('PDF generation warning:', pdfErr.message);
+        // Silently fail PDF generation
       }
 
       setProgress('');
@@ -213,7 +213,6 @@ export default function ClientInvoiceWorkflow() {
 
       setStep('confirm');
     } catch (err) {
-      console.error('Workflow error:', err);
       setError(err.message || 'Error en el proceso de facturación');
       setStep('error');
     } finally {
@@ -263,7 +262,7 @@ export default function ClientInvoiceWorkflow() {
         try {
           stampedPdfResponse = await invoiceService.generatePDF(cfdiXml);
         } catch (pdfErr) {
-          console.warn('PDF generation failed, but invoice was stamped:', pdfErr.message);
+          // Silently fail PDF generation
         }
       }
 
@@ -278,7 +277,6 @@ export default function ClientInvoiceWorkflow() {
 
       setStep('success');
     } catch (err) {
-      console.error('Stamping error:', err);
       setError(err.message || 'Error al timbrar la factura');
       setStep('error');
     } finally {

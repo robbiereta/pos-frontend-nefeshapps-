@@ -78,7 +78,7 @@ export default function CashDrawer() {
       const response = await cashDrawerService.getCutoffs({ limit: 100, page: 1 });
       setCutoffHistory(Array.isArray(response?.data) ? response.data : []);
     } catch (err) {
-      console.error('Error loading cutoff history:', err);
+      // Silent error
     } finally {
       setHistoryLoading(false);
     }
@@ -151,7 +151,6 @@ export default function CashDrawer() {
 
       setStep('preview');
     } catch (err) {
-      console.error('Error generating cutoff:', err);
       setError('Error al generar el corte de caja: ' + err.message);
     } finally {
       setLoading(false);
@@ -172,7 +171,6 @@ export default function CashDrawer() {
       setStep('form');
       setCutoffData(null);
     } catch (err) {
-      console.error('Error saving cutoff:', err);
       toast.error('Error al guardar el corte: ' + err.message);
     } finally {
       setLoading(false);
@@ -215,15 +213,7 @@ export default function CashDrawer() {
         userId: currentUser?._id || currentUser?.id
       };
 
-      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
-
       const response = await invoiceService.generateGlobal(invoiceData);
-      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
-      console.log('📋 Response data:', response?.data);
-      console.log('🆔 Invoice ID:', response?.data?._id);
-      console.log('⏰ Saved at:', response?.data?.savedAt);
-      console.log('📄 UUID:', response?.data?.uuid);
-      console.log('💰 Total:', response?.data?.Total);
       toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {
@@ -271,15 +261,7 @@ export default function CashDrawer() {
         userId: currentUser?._id || currentUser?.id
       };
 
-      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
-
       const response = await invoiceService.generateGlobal(invoiceData);
-      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
-      console.log('📋 Response data:', response?.data);
-      console.log('🆔 Invoice ID:', response?.data?._id);
-      console.log('⏰ Saved at:', response?.data?.savedAt);
-      console.log('📄 UUID:', response?.data?.uuid);
-      console.log('💰 Total:', response?.data?.Total);
       toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {
@@ -302,7 +284,6 @@ export default function CashDrawer() {
       loadCutoffHistory();
       setShowDeleteConfirm(null);
     } catch (err) {
-      console.error('Error deleting cutoff:', err);
       toast.error('Error al eliminar corte: ' + err.message);
     } finally {
       setLoading(false);

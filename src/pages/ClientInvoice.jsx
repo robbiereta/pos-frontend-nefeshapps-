@@ -127,22 +127,12 @@ export default function ClientInvoice() {
         notasPartidas: items
       };
 
-      console.log('📄 Invoice JSON to send:', JSON.stringify(invoiceData, null, 2));
-
       const response = await invoiceService.generateClient(invoiceData);
-
-      console.log('✅ Full Invoice response:', JSON.stringify(response, null, 2));
-      console.log('📋 Response data:', response?.data);
-      console.log('🆔 Invoice ID:', response?.data?._id);
-      console.log('⏰ Saved at:', response?.data?.savedAt);
-      console.log('📄 UUID:', response?.data?.uuid);
-      console.log('💰 Total:', response?.data?.Total);
 
       setMessage('Factura de cliente generada y timbrada correctamente');
       setResult(response);
       toast.success('Factura generada y timbrada correctamente');
     } catch (err) {
-      console.error('Error generating invoice:', err);
       setError(err.message || 'Error al generar la factura');
       toast.error(err.message || 'Error al generar la factura');
     } finally {

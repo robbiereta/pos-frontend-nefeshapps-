@@ -22,16 +22,10 @@ const ListSales = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('📋 Fetching sales...');
       const salesData = await salesService.getAllSales({ limit: 1000 });
-      console.log('📋 Sales data received:', JSON.stringify(salesData, null, 2));
-      console.log('📋 Sales data type:', typeof salesData);
-      console.log('📋 Is array:', Array.isArray(salesData));
-      console.log('📋 Sales length:', Array.isArray(salesData) ? salesData.length : 'not an array');
       setAllSales(Array.isArray(salesData) ? salesData : []);
       setCurrentPage(1);
     } catch (error) {
-      console.error('❌ Error fetching sales:', error);
       setError(error.message || 'Error loading sales');
       toast.error(error.message || 'Error al cargar ventas');
     } finally {
@@ -64,9 +58,6 @@ const ListSales = () => {
   );
 
   const handleViewDetails = (sale) => {
-    console.log('Sale selected:', sale);
-    console.log('Items:', sale.items);
-    console.log('Sale data structure:', JSON.stringify(sale, null, 2));
     setSelectedSale(sale);
     setShowDetails(true);
   };
