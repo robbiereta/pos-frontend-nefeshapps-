@@ -23,13 +23,33 @@ const daysOverdue = (dueDate) => {
   return Math.floor((today - due) / (1000 * 60 * 60 * 24));
 };
 
+// ¿La nota está vencida? = tiene saldo pendiente + fecha de vencimiento
+// ya pasó + no está pagada ni cancelada. Usado para el orden de la tabla,
+// el resaltado de la fila y el contador "Vencidas" del resumen.
+const isOverdue = (n) => {
+  if (!n) return false;
+  if (n.status === 'paid' || n.status === 'cancelled') return false;
+  const balance = Number(n.balance ?? (n.amount - (n.paidAmount || 0))) || 0;
+  return balance > 0 && daysOverdue(n.dueDate) > 0;
+};
+
 const STATUS_OPTIONS = [
   { value: '',          label: 'Todos' },
   { value: 'pending',   label: 'Pendiente' },
+  { value: 'overdue',   label: 'Vencida' },
   { value: 'partial',   label: 'Parcial' },
   { value: 'paid',      label: 'Pagada' },
   { value: 'cancelled', label: 'Cancelada' },
 ];
+
+// Etiquetas de estado mostradas en los badges de la tabla.
+const STATUS_LABELS = {
+  pending:   'Pendiente',
+  overdue:   'Vencida',
+  partial:   'Parcial',
+  paid:      'Pagada',
+  cancelled: 'Cancelada',
+};
 
 /**
  * Lista de notas (compartida para CxC y CxP).
@@ -58,9 +78,14 @@ export default function NotesList({ type, title }) {
 
   const isReceivable = type === 'receivable';
 
+  // Un solo useEffect para que la lista no se cargue dos veces en el
+  // mount (antes había dos useEffect, uno por [type] y otro por
+  // [statusFilter]; al montar type=inicial y statusFilter='' disparaban
+  // los dos con la misma query → 2 GET idénticos al backend).
   useEffect(() => {
     loadNotes();
-  }, [type]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, statusFilter]);
 
   const loadNotes = async () => {
     setLoading(true);
@@ -82,23 +107,28 @@ export default function NotesList({ type, title }) {
     }
   };
 
-  // Refrescar al cambiar filtro de estado
-  useEffect(() => {
-    loadNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  // ─── Filtro + paginación client-side ───
+  // ─── Filtro + orden + paginación client-side ───
+  // El backend ordena por fechaVencimiento ASC; en UI priorizamos notas
+  // vencidas (vencidas → pendientes → pagadas/canceladas) y dentro de
+  // cada grupo por fechaVencimiento ASC para que lo más urgente quede
+  // arriba, sin importar la paginación del backend.
   const filteredNotes = useMemo(() => {
-    if (!searchQuery) return notes;
     const q = searchQuery.toLowerCase();
-    return notes.filter(n =>
+    const matched = !searchQuery ? notes : notes.filter(n =>
       (n.contactName || '').toLowerCase().includes(q) ||
       (n.contactRfc || '').toLowerCase().includes(q) ||
       (n.reference || '').toLowerCase().includes(q) ||
       (n.concept || '').toLowerCase().includes(q) ||
       (n.folio || '').toLowerCase().includes(q)
     );
+    return [...matched].sort((a, b) => {
+      const aOverdue = isOverdue(a);
+      const bOverdue = isOverdue(b);
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // vencidas primero
+      const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return av - bv; // fechaVencimiento ASC
+    });
   }, [notes, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredNotes.length / itemsPerPage));
@@ -114,10 +144,8 @@ export default function NotesList({ type, title }) {
     const totalBalance = notes.reduce(
       (s, n) => s + Number(n.balance ?? (n.amount - (n.paidAmount || 0))), 0
     );
-    const overdue = notes.filter(n => {
-      const bal = Number(n.balance ?? (n.amount - (n.paidAmount || 0)));
-      return bal > 0 && daysOverdue(n.dueDate) > 0;
-    }).length;
+    // Excluir pagadas y canceladas del conteo de "Vencidas"
+    const overdue = notes.filter(isOverdue).length;
     return { totalAmount, totalPaid, totalBalance, overdue, count: notes.length };
   }, [notes]);
 
@@ -260,7 +288,14 @@ export default function NotesList({ type, title }) {
                 <tbody>
                   {displayedNotes.map((n) => {
                     const balance = Number(n.balance ?? (n.amount - (n.paidAmount || 0)));
-                    const overdue = balance > 0 && daysOverdue(n.dueDate) > 0 && n.status !== 'cancelled';
+                    const overdue = isOverdue(n);
+                    // El badge de estado: si la nota está vencida, mostramos
+                    // "Vencida" (no "Pendiente") aunque el backend aún no
+                    // haya movido el status a 'vencida'.
+                    const badgeClass = overdue ? 'overdue' : (n.status || 'pending');
+                    const badgeLabel = overdue
+                      ? 'Vencida'
+                      : (STATUS_LABELS[n.status] || n.status);
                     return (
                       <tr key={n._id} className={overdue ? 'overdue-row' : ''}>
                         <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
@@ -292,8 +327,8 @@ export default function NotesList({ type, title }) {
                           ${balance.toFixed(2)}
                         </td>
                         <td>
-                          <span className={`notes-badge ${n.status || 'pending'}`}>
-                            {({ pending: 'Pendiente', partial: 'Parcial', paid: isReceivable ? 'Cobrada' : 'Pagada', cancelled: 'Cancelada' })[n.status] || n.status}
+                          <span className={`notes-badge ${badgeClass}`}>
+                            {badgeLabel}
                           </span>
                         </td>
                         <td>

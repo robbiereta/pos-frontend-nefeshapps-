@@ -101,9 +101,21 @@ export default function NoteDetailModal({ open, onClose, note, onAddPayment, onC
   if (!open || !note) return null;
 
   const balance = Number(note.balance ?? (note.amount - (note.paidAmount || 0))) || 0;
-  const statusClass = note.status || 'pending';
+  // El badge muestra "Vencida" si la nota tiene saldo y su fecha de
+  // vencimiento ya pasó (independientemente del status que mande el
+  // backend, para que la UI siempre refleje la realidad operativa).
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due = note.dueDate ? new Date(note.dueDate) : null;
+  if (due) due.setHours(0, 0, 0, 0);
+  const isOverdue = balance > 0 && due && !isNaN(due.getTime()) && (today - due) > 0
+    && note.status !== 'paid' && note.status !== 'cancelled';
+  const statusClass = isOverdue ? 'overdue' : (note.status || 'pending');
   const statusLabel = {
-    pending: 'Pendiente', partial: 'Parcial', paid: 'Pagada', cancelled: 'Cancelada',
+    pending:   'Pendiente',
+    overdue:   'Vencida',
+    partial:   'Parcial',
+    paid:      note.type === 'receivable' ? 'Cobrada' : 'Pagada',
+    cancelled: 'Cancelada',
   }[statusClass] || statusClass;
 
   return (
