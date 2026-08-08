@@ -79,6 +79,29 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
     return () => { cancelled = true; };
   }, [open, type]);
 
+  // Lista filtrada por la búsqueda del usuario.
+  // IMPORTANTE: este useMemo DEBE ir antes de cualquier early return.
+  // Si lo pones después de `if (!open) return null`, React lanza
+  // "Rendered more hooks than during the previous render" al abrir el
+  // modal, porque en el primer render (open=false) no se llama y en el
+  // segundo (open=true) sí — React detecta la inconsistencia y desmonta.
+  const filteredClients = useMemo(() => {
+    if (!clientSearch) return clients.slice(0, 100);
+    const q = clientSearch.toLowerCase();
+    return clients
+      .filter(c =>
+        (c.nombre || '').toLowerCase().includes(q) ||
+        (c.rfc || '').toLowerCase().includes(q)
+      )
+      .slice(0, 100);
+  }, [clients, clientSearch]);
+
+  // Helper: si hay cliente seleccionado, mostrar su info (no es un hook,
+  // pero lo movemos arriba junto al useMemo por consistencia).
+  const selectedClient = form.clienteId
+    ? clients.find(c => c._id === form.clienteId)
+    : null;
+
   if (!open) return null;
 
   const handleChange = (e) => {
@@ -154,23 +177,6 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
   const title = initial
     ? (type === 'receivable' ? 'Editar Nota por Cobrar' : 'Editar Nota por Pagar')
     : (type === 'receivable' ? 'Nueva Nota por Cobrar' : 'Nueva Nota por Pagar');
-
-  // Lista filtrada por la búsqueda del usuario
-  const filteredClients = useMemo(() => {
-    if (!clientSearch) return clients.slice(0, 100);
-    const q = clientSearch.toLowerCase();
-    return clients
-      .filter(c =>
-        (c.nombre || '').toLowerCase().includes(q) ||
-        (c.rfc || '').toLowerCase().includes(q)
-      )
-      .slice(0, 100);
-  }, [clients, clientSearch]);
-
-  // Helper: si hay cliente seleccionado, mostrar su info
-  const selectedClient = form.clienteId
-    ? clients.find(c => c._id === form.clienteId)
-    : null;
 
   return (
     <div className="notes-modal-backdrop" onClick={onClose}>
