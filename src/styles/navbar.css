@@ -32,7 +32,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+  background: var(--brand-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -40,6 +40,12 @@
   font-weight: 700;
   font-size: var(--text-sm);
   box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease-standard),
+              box-shadow var(--duration-fast) var(--ease-standard);
+}
+.navbar-modern__brand:hover .navbar-modern__brand-mark {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .navbar-modern__primary {
@@ -67,6 +73,15 @@
 .nav-link.active {
   background: var(--brand-50);
   color: var(--brand-700);
+  position: relative;
+}
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 0.875rem; right: 0.875rem; bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand-gradient);
 }
 .nav-link__icon { font-size: 16px; line-height: 1; }
 

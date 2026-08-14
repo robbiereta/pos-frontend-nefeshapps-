@@ -63,15 +63,14 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1 className="page-header__title">Dashboard</h1>
-          <p className="page-header__subtitle">Resumen de actividad reciente</p>
-        </div>
-        <div className="row">
-          <Button variant="secondary" onClick={fetchData}>↻ Actualizar</Button>
-          <Button variant="primary" onClick={() => (window.location.href = '/pos')}>+ Nueva venta</Button>
-        </div>
+      <div className="page-title-hero">
+        <h1>Dashboard</h1>
+        <p>Resumen de actividad reciente — controla tu operación desde un solo lugar.</p>
+      </div>
+
+      <div className="row" style={{ marginBottom: 16, justifyContent: 'flex-end' }}>
+        <Button variant="secondary" onClick={fetchData}>↻ Actualizar</Button>
+        <Button variant="primary" onClick={() => (window.location.href = '/pos')}>+ Nueva venta</Button>
       </div>
 
       <div className="kpi-grid">
