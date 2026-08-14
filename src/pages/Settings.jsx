@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../services/api';
 import { useToast } from '../components/ui/Toast.jsx';
+import Button from '../components/ui/Button';
 import './Settings.css';
 
 export default function Settings() {
@@ -182,7 +183,7 @@ export default function Settings() {
 
   return (
     <div className="settings-container">
-      <div className="settings-header">
+      <div className="page-title-hero">
         <h1>Configuración</h1>
         <p>Administra tu perfil y configuración de facturación</p>
       </div>
@@ -482,13 +483,14 @@ export default function Settings() {
                     <small>Mensaje que aparecerá al pie del recibo ({emisorForm.receiptMessage?.length || 0}/200 caracteres)</small>
                   </div>
 
-                  <button
+                  <Button
                     type="submit"
-                    className="btn btn-primary"
+                    variant="primary"
                     disabled={loading}
+                    loading={loading}
                   >
                     {loading ? 'Guardando...' : 'Guardar Configuración'}
-                  </button>
+                  </Button>
                 </form>
               </div>
             </div>
