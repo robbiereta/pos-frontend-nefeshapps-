@@ -3,6 +3,7 @@ import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
 import { notesService } from '../services/notesService';
 import BarcodeSearch from '../components/BarcodeSearch';
+import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
 
 const Pos = () => {
@@ -620,27 +621,27 @@ const Pos = () => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Punto de Venta (POS)</h1>
-      
+    <div className="pos-page">
+      <div className="page-title-hero">
+        <div>
+          <h1>Punto de Venta</h1>
+          <p>Agrega productos al carrito, asigna un cliente y procesa la venta.</p>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            onClick={fetchProducts}
+          >
+            Actualizar catálogo
+          </Button>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px' }}>
         {/* Products Section */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h2>Catálogo de Productos</h2>
-            <button
-              onClick={fetchProducts}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#2c5aa0',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Actualizar
-            </button>
           </div>
 
           <div style={{ marginBottom: '12px' }}>
@@ -885,19 +886,23 @@ const Pos = () => {
                 ))}
               </div>
 
-              {/* Totals */}
+              {/* Totals — ported to .stats-grid / .stat-card for the pwa visual identity */}
               <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                  <span style={{ color: '#666' }}>Subtotal:</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>${calculateSubtotal().toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '13px', borderBottom: '1px solid #e9ecef', paddingBottom: '12px' }}>
-                  <span style={{ color: '#666' }}>IVA (16%):</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>${calculateTax().toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '700' }}>
-                  <span>Total:</span>
-                  <span style={{ color: '#667eea' }}>${calculateTotal().toFixed(2)}</span>
+                <div className="stats-grid" style={{ marginBottom: 0 }}>
+                  <div className="stat-card">
+                    <div className="stat-card__value">${calculateSubtotal().toFixed(2)}</div>
+                    <div className="stat-card__label">Subtotal</div>
+                  </div>
+                  <div className="stat-card info">
+                    <div className="stat-card__value">${calculateTax().toFixed(2)}</div>
+                    <div className="stat-card__label">IVA 16%</div>
+                  </div>
+                  <div className="stat-card success" style={{ gridColumn: 'span 2' }}>
+                    <div className="stat-card__value" style={{ color: 'var(--brand-500)' }}>
+                      ${calculateTotal().toFixed(2)}
+                    </div>
+                    <div className="stat-card__label">Total</div>
+                  </div>
                 </div>
               </div>
 
