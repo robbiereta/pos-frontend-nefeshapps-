@@ -229,16 +229,16 @@ label.field {
 /* Stats grid — pwa-builder-output .stats-grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 .stat-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-left: 4px solid var(--brand-500);
   border-radius: var(--radius-lg);
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-3) var(--space-4);
   box-shadow: var(--shadow-xs);
   transition: transform var(--duration-fast) var(--ease-standard),
               box-shadow var(--duration-fast) var(--ease-standard);
@@ -253,7 +253,7 @@ label.field {
 .stat-card.info    { border-left-color: var(--info-500); }
 
 .stat-card__value {
-  font-size: var(--text-3xl);
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--neutral-900);
   letter-spacing: var(--tracking-tight);
@@ -261,9 +261,11 @@ label.field {
   margin-bottom: var(--space-1);
 }
 .stat-card__label {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--neutral-500);
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .stat-card__hint {
   font-size: var(--text-xs);
@@ -335,18 +337,20 @@ label.field {
   background: var(--brand-gradient);
   color: white;
   border-radius: var(--radius-lg);
-  padding: var(--space-6) var(--space-8);
-  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-4);
   box-shadow: var(--shadow-md);
 }
 .page-title-hero h1 {
   color: white;
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   margin: 0 0 var(--space-1) 0;
+  line-height: 1.2;
 }
 .page-title-hero p {
   color: rgba(255, 255, 255, 0.85);
   font-size: var(--text-sm);
+  margin: 0;
 }
 
 /* Modal/form pattern (pwa-builder-output .modal-overlay + .form-row) */
