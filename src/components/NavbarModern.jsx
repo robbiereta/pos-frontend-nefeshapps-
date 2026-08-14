@@ -4,16 +4,16 @@ import { authService } from '../services/api';
 import '../styles/navbar.css';
 
 const NAV_ITEMS = [
-  { path: '/pos',              label: 'POS',              icon: '🛒' },
-  { path: '/dashboard',        label: 'Dashboard',        icon: '📊' },
-  { path: '/products',         label: 'Productos',        icon: '📦' },
-  { path: '/list-sales',       label: 'Ventas',           icon: '💾' },
-  { path: '/clients',          label: 'Clientes',         icon: '👥' },
-  { path: '/invoices',         label: 'Facturas',         icon: '📋' },
-  { path: '/notes-receivable', label: 'Notas por Cobrar', icon: '💰' },
-  { path: '/notes-payable',    label: 'Notas por Pagar',  icon: '💸' },
-  { path: '/cash-drawer',      label: 'Cortes de Caja',   icon: '🧾' },
-  { path: '/settings',         label: 'Configuración',    icon: '⚙️' },
+  { path: '/pos',              label: 'POS' },
+  { path: '/dashboard',        label: 'Dashboard' },
+  { path: '/products',         label: 'Productos' },
+  { path: '/list-sales',       label: 'Ventas' },
+  { path: '/clients',          label: 'Clientes' },
+  { path: '/invoices',         label: 'Facturas' },
+  { path: '/notes-receivable', label: 'Notas por Cobrar' },
+  { path: '/notes-payable',    label: 'Notas por Pagar' },
+  { path: '/cash-drawer',      label: 'Cortes de Caja' },
+  { path: '/settings',         label: 'Configuración' },
 ];
 
 function initials(email) {
@@ -50,7 +50,6 @@ export default function NavbarModern() {
               className={`nav-link ${active ? 'active' : ''}`}
               onClick={() => setOpen(false)}
             >
-              <span className="nav-link__icon" aria-hidden>{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           );
