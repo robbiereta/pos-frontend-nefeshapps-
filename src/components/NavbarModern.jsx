@@ -1,19 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authService } from '../services/api';
 import '../styles/navbar.css';
 
-const NAV_ITEMS = [
-  { path: '/pos',              label: 'POS',              icon: '🛒' },
-  { path: '/dashboard',        label: 'Dashboard',        icon: '📊' },
-  { path: '/products',         label: 'Productos',        icon: '📦' },
-  { path: '/list-sales',       label: 'Ventas',           icon: '💾' },
-  { path: '/clients',          label: 'Clientes',         icon: '👥' },
-  { path: '/invoices',         label: 'Facturas',         icon: '📋' },
-  { path: '/notes-receivable', label: 'Notas por Cobrar', icon: '💰' },
-  { path: '/notes-payable',    label: 'Notas por Pagar',  icon: '💸' },
-  { path: '/cash-drawer',      label: 'Cortes de Caja',   icon: '🧾' },
-  { path: '/settings',         label: 'Configuración',    icon: '⚙️' },
+// Each nav item lives in exactly one section. Section order = visual order
+// left → right. Sections render with a thin divider between them on desktop
+// and stack as labelled groups on the mobile sheet.
+const NAV_SECTIONS = [
+  {
+    id: 'operacion',
+    label: 'Operación',
+    items: [
+      { path: '/pos',        label: 'POS' },
+      { path: '/dashboard',  label: 'Dashboard' },
+      { path: '/products',   label: 'Productos' },
+      { path: '/list-sales', label: 'Ventas' },
+      { path: '/clients',    label: 'Clientes' },
+    ],
+  },
+  {
+    id: 'finanzas',
+    label: 'Finanzas',
+    items: [
+      { path: '/invoices',         label: 'Facturas' },
+      { path: '/notes-receivable', label: 'Notas por Cobrar' },
+      { path: '/notes-payable',    label: 'Notas por Pagar' },
+      { path: '/cash-drawer',      label: 'Cortes de Caja' },
+    ],
+  },
+  {
+    id: 'sistema',
+    label: 'Sistema',
+    items: [
+      { path: '/settings', label: 'Configuración' },
+    ],
+  },
 ];
 
 function initials(email) {
@@ -32,6 +53,13 @@ export default function NavbarModern() {
     window.location.href = '/login';
   };
 
+  const isActive = (path) =>
+    location.pathname === path
+    || (path !== '/dashboard' && location.pathname.startsWith(path));
+
+  // Flatten once for the legacy "any link active" check used by the mobile toggle.
+  const flatItems = useMemo(() => NAV_SECTIONS.flatMap(s => s.items), []);
+
   return (
     <header className="navbar-modern" role="banner">
       <Link to="/dashboard" className="navbar-modern__brand" onClick={() => setOpen(false)}>
@@ -40,21 +68,33 @@ export default function NavbarModern() {
       </Link>
 
       <nav className={`navbar-modern__primary ${open ? 'open' : ''}`} aria-label="Principal">
-        {NAV_ITEMS.map(item => {
-          const active = location.pathname === item.path
-            || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`nav-link ${active ? 'active' : ''}`}
-              onClick={() => setOpen(false)}
-            >
-              <span className="nav-link__icon" aria-hidden>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        {NAV_SECTIONS.map((section, sIdx) => (
+          <React.Fragment key={section.id}>
+            {sIdx > 0 && <span className="navbar-modern__divider" aria-hidden />}
+            <div className="navbar-modern__section" data-section={section.id}>
+              {section.items.map(item => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </React.Fragment>
+        ))}
+        {/* Mobile-only section labels */}
+        {open && (
+          <div className="navbar-modern__section-labels">
+            {NAV_SECTIONS.map(section => (
+              <div key={section.id} className="navbar-modern__section-label">
+                {section.label}
+              </div>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div className="navbar-modern__spacer" />
