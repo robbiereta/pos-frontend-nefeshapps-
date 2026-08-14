@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cotizacionService } from '../services/cotizacionService';
 import { useToast } from '../components/ui/Toast.jsx';
+import Button from '../components/ui/Button';
 import CotizacionModal from '../components/CotizacionModal';
 import CotizacionDetail from '../components/CotizacionDetail';
 import './Cotizaciones.css';
@@ -79,15 +80,19 @@ export default function Cotizaciones() {
 
   return (
     <div className="cotizaciones-page">
-      <div className="page-header">
-        <h1>📋 Cotizaciones</h1>
-        <div className="page-header-actions">
-          <button
-            className="btn btn-primary"
+      <div className="page-title-hero">
+        <div>
+          <h1>📋 Cotizaciones</h1>
+          <p>Crea, envía y da seguimiento a tus cotizaciones antes de facturar.</p>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="primary"
+            leftIcon={<span aria-hidden>＋</span>}
             onClick={() => setShowCreate(true)}
           >
-            + Nueva cotización
-          </button>
+            Nueva cotización
+          </Button>
         </div>
       </div>
 
@@ -127,13 +132,13 @@ export default function Cotizaciones() {
       ) : items.length === 0 ? (
         <div className="empty-state">
           <p>No hay cotizaciones {estadoFilter !== 'todas' ? `en estado "${estadoFilter}"` : ''}.</p>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          <Button variant="primary" onClick={() => setShowCreate(true)}>
             Crear la primera
-          </button>
+          </Button>
         </div>
       ) : (
         <>
-          <table className="data-table">
+          <table className="invoice-table data-table">
             <thead>
               <tr>
                 <th>Folio</th>
@@ -182,9 +187,9 @@ export default function Cotizaciones() {
           </table>
 
           <div className="pagination">
-            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>‹ Anterior</button>
+            <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Anterior</Button>
             <span>Página {page} de {totalPages} ({total} total)</span>
-            <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Siguiente ›</button>
+            <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Siguiente →</Button>
           </div>
         </>
       )}
