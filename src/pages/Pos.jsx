@@ -624,13 +624,12 @@ const Pos = () => {
     <div className="pos-page">
       <div className="page-title-hero">
         <div>
-          <h1>🛒 Punto de Venta</h1>
+          <h1>Punto de Venta</h1>
           <p>Agrega productos al carrito, asigna un cliente y procesa la venta.</p>
         </div>
         <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
           <Button
             variant="secondary"
-            leftIcon={<span aria-hidden>🔄</span>}
             onClick={fetchProducts}
           >
             Actualizar catálogo
