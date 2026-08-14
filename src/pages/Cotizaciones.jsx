@@ -82,13 +82,12 @@ export default function Cotizaciones() {
     <div className="cotizaciones-page">
       <div className="page-title-hero">
         <div>
-          <h1>📋 Cotizaciones</h1>
+          <h1>Cotizaciones</h1>
           <p>Crea, envía y da seguimiento a tus cotizaciones antes de facturar.</p>
         </div>
         <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
           <Button
             variant="primary"
-            leftIcon={<span aria-hidden>＋</span>}
             onClick={() => setShowCreate(true)}
           >
             Nueva cotización
