@@ -224,19 +224,25 @@ export default function Products() {
 
   return (
     <div className="products-page">
-      <div className="page-header">
-        <h1>Gestión de Productos</h1>
-        <div className="page-header-actions">
-          <button
-            className="btn btn-secondary"
+      <div className="page-title-hero">
+        <div>
+          <h1>Gestión de Productos</h1>
+          <p>Administra tu catálogo, importa desde Excel y controla el inventario.</p>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
             onClick={() => setShowImportModal(true)}
             title="Importar productos desde Excel o CSV"
           >
-            📥 Importar
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            + Nuevo Producto
-          </button>
+            Importar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            Nuevo Producto
+          </Button>
         </div>
       </div>
 
