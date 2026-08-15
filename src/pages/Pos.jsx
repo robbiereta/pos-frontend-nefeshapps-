@@ -3,6 +3,7 @@ import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
 import { notesService } from '../services/notesService';
 import BarcodeSearch from '../components/BarcodeSearch';
+import QuickAddProductModal from '../components/QuickAddProductModal';
 import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
 
@@ -29,6 +30,7 @@ const Pos = () => {
   const [paymentForm, setPaymentForm] = useState('01');
   const [loading, setLoading] = useState(false);
   const [emisor, setEmisor] = useState(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const toast = useToast();
 
   // Fetch products, clients, and emisor config on mount
@@ -261,6 +263,66 @@ const Pos = () => {
       };
       setCart([...cart, newItem]);
     }
+  };
+
+  // Quick-add product from the QuickAddProductModal.
+  // Same IVA/merge logic as addToCart, but takes an explicit quantity.
+  const handleQuickAddToCart = (product, qty = 1) => {
+    const quantity = Math.max(1, parseInt(qty, 10) || 1);
+    const unitPrice = product.valorUnitario || 0;
+    const name = product.nombre || product.descripcion || 'Producto';
+
+    const existing = cart.find((item) => item.id === product.id);
+    if (existing) {
+      const newCantidad = existing.cantidad + quantity;
+      const newImporte = newCantidad * existing.valorUnitario;
+      const baseAmount = newImporte / 1.16;
+      const ivaAmount = newImporte - baseAmount;
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                cantidad: newCantidad,
+                importe: newImporte,
+                impuestos: {
+                  traslados: [{
+                    base: baseAmount,
+                    impuesto: '002',
+                    tipoFactor: 'Tasa',
+                    tasaOCuota: '0.160000',
+                    importe: ivaAmount,
+                  }],
+                },
+              }
+            : item,
+        ),
+      );
+      toast.success(`+${quantity} ${name}`);
+    } else {
+      const baseAmount = unitPrice / 1.16;
+      const ivaAmount = unitPrice - baseAmount;
+      setCart([
+        ...cart,
+        {
+          ...product,
+          cantidad: quantity,
+          importe: unitPrice * quantity,
+          descuento: 0,
+          impuestos: {
+            traslados: [{
+              base: baseAmount * quantity,
+              impuesto: '002',
+              tipoFactor: 'Tasa',
+              tasaOCuota: '0.160000',
+              importe: ivaAmount * quantity,
+            }],
+          },
+        },
+      ]);
+      toast.success(`Agregado: ${name} ×${quantity}`);
+    }
+    setShowQuickAdd(false);
   };
 
   // Update item quantity
@@ -704,7 +766,31 @@ const Pos = () => {
             padding: '20px',
             textAlign: 'center'
           }}>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>🛒 Carrito</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>🛒 Carrito</h2>
+              <button
+                type="button"
+                onClick={() => setShowQuickAdd(true)}
+                title="Buscar o crear producto"
+                aria-label="Buscar o crear producto"
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: '1.5px solid rgba(255,255,255,0.5)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.35)')}
+                onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+              >
+                ➕ Agregar
+              </button>
+            </div>
           </div>
 
           {cart.length === 0 ? (
@@ -1106,6 +1192,12 @@ const Pos = () => {
         </div>
       </div>
 
+      {showQuickAdd && (
+        <QuickAddProductModal
+          onClose={() => setShowQuickAdd(false)}
+          onAddToCart={handleQuickAddToCart}
+        />
+      )}
     </div>
   );
 };
