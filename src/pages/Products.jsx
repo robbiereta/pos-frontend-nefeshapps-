@@ -4,6 +4,7 @@ import ProductModal from '../components/ProductModal';
 import QuantityModal from '../components/QuantityModal';
 import BarcodeSearch from '../components/BarcodeSearch';
 import ImportProductsModal from '../components/ImportProductsModal';
+import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
 import './Products.css';
 
