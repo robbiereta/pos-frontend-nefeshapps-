@@ -127,7 +127,8 @@ const Pos = () => {
       setLoadingProducts(true);
       setProductsError(null);
       const response = await productService.getProducts({ limit: 100, activo: 'true' });
-      const productsList = response.data?.products || response.data || [];
+      const productsListRaw = response.data?.products;
+      const productsList = Array.isArray(productsListRaw) ? productsListRaw : [];
 
       // Map API products to POS format
       const posProducts = productsList.map(p => ({
