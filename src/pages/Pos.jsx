@@ -44,7 +44,8 @@ const Pos = () => {
     try {
       setLoadingClients(true);
       const response = await clientService.getAllClients({ limit: 100 });
-      setClients(response.data?.clients || response.data || []);
+      const clientsList = response.data?.clients;
+      setClients(Array.isArray(clientsList) ? clientsList : []);
     } catch (err) {
       setClients([]);
     } finally {
