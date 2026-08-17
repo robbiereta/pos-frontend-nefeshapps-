@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { notesService, computeAgingClient } from '../services/notesService';
 import { useToast } from './ui/Toast.jsx';
+import Button from './ui/Button.jsx';
 import NoteModal from './NoteModal.jsx';
 import PaymentModal from './PaymentModal.jsx';
 import NoteDetailModal from './NoteDetailModal.jsx';
@@ -170,14 +171,23 @@ export default function NotesList({ type, title }) {
   // ─── Render ───
   return (
     <div className="notes-page">
-      <div className="notes-header">
-        <h1>{title}</h1>
-        <button
-          className="btn btn-primary"
-          onClick={() => { setEditingNote(null); setShowForm(true); }}
-        >
-          + Nueva Nota
-        </button>
+      <div className="page-title-hero">
+        <div>
+          <h1>{title}</h1>
+          <p>
+            {type === 'receivable'
+              ? 'Cuentas por cobrar — controla los saldos pendientes de tus clientes.'
+              : 'Cuentas por pagar — supervisa los compromisos con tus proveedores.'}
+          </p>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="primary"
+            onClick={() => { setEditingNote(null); setShowForm(true); }}
+          >
+            Nueva Nota
+          </Button>
+        </div>
       </div>
 
       {error && (
