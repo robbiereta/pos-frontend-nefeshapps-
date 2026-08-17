@@ -96,8 +96,8 @@ export default function Products() {
   const fetchStats = async () => {
     try {
       const response = await productService.getInventoryStats();
-      const statsData = response.data?.stats || response.data || {};
-      setStats(statsData);
+      const statsData = response.data?.stats;
+      setStats(statsData && typeof statsData === 'object' ? statsData : {});
     } catch (err) {
       // Silent error
     }
@@ -106,7 +106,8 @@ export default function Products() {
   const fetchLowStock = async () => {
     try {
       const response = await productService.getLowStockProducts();
-      const lowStockData = response.data?.products || response.data || [];
+      const lowStockData = response.data?.products;
+      setLowStockProducts(Array.isArray(lowStockData) ? lowStockData : []);
       setLowStockProducts(lowStockData);
     } catch (err) {
       // Silent error

@@ -44,8 +44,9 @@ export default function Cotizaciones() {
         cotizacionService.list({ page, limit, estado: estadoFilter, searchQuery }),
         cotizacionService.stats().catch(() => null),
       ]);
-      const list = listRes?.data?.cotizaciones || listRes?.cotizaciones || [];
-      const pagination = listRes?.data?.pagination || listRes?.pagination || {};
+      const listRaw = listRes?.data?.cotizaciones;
+      const list = Array.isArray(listRaw) ? listRaw : [];
+      const pagination = listRes?.data?.pagination;
       setItems(list);
       setTotalPages(pagination.pages || 1);
       setTotal(pagination.total || list.length);

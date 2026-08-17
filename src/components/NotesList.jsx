@@ -76,7 +76,8 @@ export default function NotesList({ type, title }) {
         notesService.getNotes({ type, status: statusFilter || undefined }),
         notesService.getAging(type).catch(() => null),
       ]);
-      const list = notesRes.data || [];
+      const listRaw = notesRes.data;
+      const list = Array.isArray(listRaw) ? listRaw : [];
       setNotes(list);
       // Si el backend no devolvió aging estructurado, calculamos
       setAging(agingRes?.buckets ? agingRes : computeAgingClient(list));
