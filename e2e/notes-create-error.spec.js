@@ -70,7 +70,7 @@ async function openModalAndFill(page) {
   await page.goto('/notes-receivable');
   await expect(page.getByRole('heading', { name: 'Notas por Cobrar', level: 1 })).toBeVisible();
 
-  await page.getByRole('button', { name: '+ Nueva Nota' }).click();
+  await page.getByRole('button', { name: 'Nueva Nota' }).click();
   // El modal debe montar correctamente: el h3 aparece.
   await expect(page.getByRole('heading', { name: 'Nueva Nota por Cobrar' })).toBeVisible();
 
