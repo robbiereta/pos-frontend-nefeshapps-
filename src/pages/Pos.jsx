@@ -44,8 +44,11 @@ const Pos = () => {
     try {
       setLoadingClients(true);
       const response = await clientService.getAllClients({ limit: 100 });
-      const clientsList = response.data?.clients;
-      setClients(Array.isArray(clientsList) ? clientsList : []);
+      // Backend returns { success, data: <clients[]>, pagination }. The
+      // defensive Array.isArray() here is for edge cases only (e.g. an
+      // unauthenticated 401 with a JSON body that doesn't match this
+      // shape). The contract is: response.data IS the array.
+      setClients(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       setClients([]);
     } finally {
@@ -127,8 +130,11 @@ const Pos = () => {
       setLoadingProducts(true);
       setProductsError(null);
       const response = await productService.getProducts({ limit: 100, activo: 'true' });
-      const productsListRaw = response.data?.products;
-      const productsList = Array.isArray(productsListRaw) ? productsListRaw : [];
+      // Same contract: response.data.products is the array.
+      // Defensive guard only kicks in for unexpected response shapes.
+      const productsList = Array.isArray(response.data?.products)
+        ? response.data.products
+        : [];
 
       // Map API products to POS format
       const posProducts = productsList.map(p => ({

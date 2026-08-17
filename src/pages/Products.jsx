@@ -96,8 +96,13 @@ export default function Products() {
   const fetchStats = async () => {
     try {
       const response = await productService.getInventoryStats();
-      const statsData = response.data?.stats;
-      setStats(statsData && typeof statsData === 'object' ? statsData : {});
+      // Contract: response.data.stats is the stats object. Defensive
+      // object guard for edge cases.
+      setStats(
+        response.data?.stats && typeof response.data.stats === 'object'
+          ? response.data.stats
+          : {},
+      );
     } catch (err) {
       // Silent error
     }
@@ -106,8 +111,10 @@ export default function Products() {
   const fetchLowStock = async () => {
     try {
       const response = await productService.getLowStockProducts();
-      const lowStockData = response.data?.products;
-      setLowStockProducts(Array.isArray(lowStockData) ? lowStockData : []);
+      // Contract: response.data.products is the low-stock array.
+      setLowStockProducts(
+        Array.isArray(response.data?.products) ? response.data.products : [],
+      );
       setLowStockProducts(lowStockData);
     } catch (err) {
       // Silent error
