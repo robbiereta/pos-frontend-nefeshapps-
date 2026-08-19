@@ -32,6 +32,7 @@ const NAV_SECTIONS = [
     id: 'sistema',
     label: 'Sistema',
     items: [
+      { path: '/team',     label: 'Equipo' },
       { path: '/settings', label: 'Configuración' },
     ],
   },

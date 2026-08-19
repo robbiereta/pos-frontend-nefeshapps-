@@ -6,9 +6,11 @@ import BarcodeSearch from '../components/BarcodeSearch';
 import ImportProductsModal from '../components/ImportProductsModal';
 import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import './Products.css';
 
 export default function Products() {
+  const { isAdmin } = useCurrentUser();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -238,21 +240,23 @@ export default function Products() {
           <h1>Gestión de Productos</h1>
           <p>Administra tu catálogo, importa desde Excel y controla el inventario.</p>
         </div>
-        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
-          <Button
-            variant="secondary"
-            onClick={() => setShowImportModal(true)}
-            title="Importar productos desde Excel o CSV"
-          >
-            Importar
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => setShowCreateModal(true)}
-          >
-            Nuevo Producto
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportModal(true)}
+              title="Importar productos desde Excel o CSV"
+            >
+              Importar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Nuevo Producto
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -454,29 +458,31 @@ export default function Products() {
                       </span>
                     </td>
                     <td>
-                      <div className="action-buttons">
-                        <button
-                          className="btn-icon"
-                          onClick={() => openEditModal(product)}
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-icon"
-                          onClick={() => openQuantityModal(product)}
-                          title="Ajustar Stock"
-                        >
-                          📦
-                        </button>
-                        <button
-                          className="btn-icon btn-danger"
-                          onClick={() => handleDelete(product._id)}
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="action-buttons">
+                          <button
+                            className="btn-icon"
+                            onClick={() => openEditModal(product)}
+                            title="Editar"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => openQuantityModal(product)}
+                            title="Ajustar Stock"
+                          >
+                            📦
+                          </button>
+                          <button
+                            className="btn-icon btn-danger"
+                            onClick={() => handleDelete(product._id)}
+                            title="Eliminar"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

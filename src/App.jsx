@@ -17,6 +17,8 @@ import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
 import Cotizaciones from './pages/Cotizaciones';
+import Team from './pages/Team';
+import RoleGuard from './components/RoleGuard';
 import NotesReceivable from './pages/NotesReceivable';
 import NotesPayable from './pages/NotesPayable';
 import NavbarModern from './components/NavbarModern';
@@ -140,10 +142,12 @@ function App() {
           path="/global-invoice"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <GlobalInvoice />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <GlobalInvoice />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -151,10 +155,12 @@ function App() {
           path="/invoices"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <InvoiceList />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <InvoiceList />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -162,10 +168,12 @@ function App() {
           path="/client-invoice"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <ClientInvoice />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <ClientInvoice />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -173,10 +181,12 @@ function App() {
           path="/client-invoice-workflow"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <ClientInvoiceWorkflow />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <ClientInvoiceWorkflow />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -184,10 +194,12 @@ function App() {
           path="/sale-to-invoice"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <SaleToInvoice />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <SaleToInvoice />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -228,10 +240,38 @@ function App() {
           path="/api-test"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <ApiTest />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <ApiTest />
+                </main>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cotizaciones"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <Cotizaciones />
+                </main>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <Settings />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
@@ -242,28 +282,6 @@ function App() {
               <NavbarModern />
               <main className="main-content">
                 <Products />
-              </main>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/cotizaciones"
-          element={
-            <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <Cotizaciones />
-              </main>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <Settings />
               </main>
             </ProtectedRoute>
           }
@@ -287,6 +305,19 @@ function App() {
               <main className="main-content">
                 <NotesPayable />
               </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <RoleGuard>
+                <NavbarModern />
+                <main className="main-content">
+                  <Team />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
