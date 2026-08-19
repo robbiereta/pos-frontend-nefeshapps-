@@ -45,14 +45,14 @@ async function stubAuthMe(ctx, user) {
   );
 }
 
+// Pages that are still owner/admin-only. (cotizaciones, invoices,
+// global-invoice, client-invoice, client-invoice-workflow and
+// sale-to-invoice were moved to the "open to every team member"
+// list per the latest business rule — cajeros quote and timbrar
+// just like the rest of the team.)
 const ADMIN_PATHS = [
   '/settings',
-  '/cotizaciones',
-  '/invoices',
-  '/global-invoice',
-  '/client-invoice',
-  '/client-invoice-workflow',
-  '/sale-to-invoice',
+  '/categories',
   // /api-test is a developer tool that imports every service on
   // mount. The redirect path itself is correct (the route is wrapped
   // in RoleGuard like the others) but the page instantiates the
@@ -94,7 +94,22 @@ test.describe('Role gates — owner keeps access to admin pages', () => {
 });
 
 test.describe('Role gates — sub-user still has access to operational pages', () => {
-  const OPEN_PATHS = ['/pos', '/products', '/clients', '/list-sales', '/dashboard'];
+  const OPEN_PATHS = [
+    '/pos',
+    '/products',
+    '/clients',
+    '/list-sales',
+    '/dashboard',
+    // Quoting + invoicing is now open to every team member — the
+    // permission was widened in the latest model.
+    '/cotizaciones',
+    '/invoices',
+    '/global-invoice',
+    '/client-invoice',
+    '/client-invoice-workflow',
+    '/sale-to-invoice',
+    '/ticket-designer',
+  ];
   for (const path of OPEN_PATHS) {
     test(`cajero can access ${path}`, async ({ page, context }) => {
       await setup(context, CAJERO_USER);
@@ -108,6 +123,9 @@ test.describe('Role gates — sub-user still has access to operational pages', (
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
       );
       await context.route('**/api/sales**', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
+      );
+      await context.route(/\/api\/(cotizaciones|invoices|clients|categories|ticket-template)/, (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
       );
       await page.goto(`http://localhost:3003${path}`, { waitUntil: 'domcontentloaded' });
