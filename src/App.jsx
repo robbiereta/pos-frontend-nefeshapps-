@@ -17,6 +17,8 @@ import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
 import Cotizaciones from './pages/Cotizaciones';
+import Team from './pages/Team';
+import RoleGuard from './components/RoleGuard';
 import NotesReceivable from './pages/NotesReceivable';
 import NotesPayable from './pages/NotesPayable';
 import NavbarModern from './components/NavbarModern';
@@ -287,6 +289,19 @@ function App() {
               <main className="main-content">
                 <NotesPayable />
               </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <RoleGuard>
+                <NavbarModern />
+                <main className="main-content">
+                  <Team />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
