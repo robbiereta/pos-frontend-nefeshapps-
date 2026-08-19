@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ProductImageUpload from './ProductImageUpload';
+import { categoryService } from '../services/categoryService';
 import './Modal.css';
 
 export default function ProductModal({ product, onClose, onSave }) {
@@ -14,6 +15,7 @@ export default function ProductModal({ product, onClose, onSave }) {
     cantidadMinima: '',
     cantidadMaxima: '',
     categoria: '',
+    categoriaId: '',
     subcategoria: '',
     unidad: '',
     claveUnidad: 'H87',
@@ -23,6 +25,25 @@ export default function ProductModal({ product, onClose, onSave }) {
   });
 
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
+
+  // Fetch the tenant's active categories once when the modal
+  // opens. The dropdown uses them to pre-fill the SAT codes; the
+  // backend re-applies the inheritance at write time so a
+  // category rename in admin doesn't accidentally mutate
+  // historical product SAT codes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await categoryService.list({ includeInactive: false });
+        if (!cancelled) setCategories(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (product) {
@@ -37,6 +58,7 @@ export default function ProductModal({ product, onClose, onSave }) {
         cantidadMinima: product.cantidadMinima || '',
         cantidadMaxima: product.cantidadMaxima || '',
         categoria: product.categoria || '',
+        categoriaId: product.categoriaId?._id || product.categoriaId || '',
         subcategoria: product.subcategoria || '',
         unidad: product.unidad || 'Pieza',
         claveUnidad: product.claveUnidad || 'H87',
@@ -46,6 +68,28 @@ export default function ProductModal({ product, onClose, onSave }) {
       });
     }
   }, [product]);
+
+  // When the user picks a category, pre-fill the SAT fields. The
+  // user can still edit them after — useful when a product
+  // matches the category for everything except the unit (e.g. a
+  // "Bebidas" sold by kilogram instead of by pieza).
+  const onCategoryChange = (catId) => {
+    const cat = categories.find((c) => c._id === catId);
+    if (!cat) {
+      setFormData((s) => ({ ...s, categoriaId: catId, categoria: '' }));
+      return;
+    }
+    setFormData((s) => ({
+      ...s,
+      categoriaId: cat._id,
+      categoria: cat.nombre,
+      claveProdServ: cat.claveProdServ,
+      claveUnidad: cat.claveUnidad,
+      unidad: cat.unidad,
+      objetoImp: cat.objetoImp,
+      tasaIVA: s.tasaIVA ?? cat.tasaIVA,
+    }));
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -81,6 +125,10 @@ export default function ProductModal({ product, onClose, onSave }) {
 
     const dataToSave = {
       ...formData,
+      // Don't send an empty string for categoriaId — the backend
+      // helper short-circuits on truthy values and we'd rather
+      // have `undefined` so the existing categoria string stays.
+      categoriaId: formData.categoriaId || undefined,
       precioUnitario: parseFloat(formData.precioUnitario) || 0,
       precioVenta: formData.precioVenta ? parseFloat(formData.precioVenta) : undefined,
       costoPorUnidad: formData.costoPorUnidad ? parseFloat(formData.costoPorUnidad) : undefined,
@@ -141,21 +189,24 @@ export default function ProductModal({ product, onClose, onSave }) {
           <div className="form-row">
             <div className="form-group">
               <label>Categoría</label>
-              <input
-                type="text"
-                name="categoria"
-                value={formData.categoria}
-                onChange={handleChange}
-                list="categorias"
-                placeholder="Ej: Alimentos"
-              />
-              <datalist id="categorias">
-                <option value="Alimentos" />
-                <option value="Bebidas" />
-                <option value="Postres" />
-                <option value="Limpieza" />
-                <option value="Utensilios" />
-              </datalist>
+              <select
+                name="categoriaId"
+                value={formData.categoriaId || ''}
+                onChange={(e) => onCategoryChange(e.target.value)}
+              >
+                <option value="">— Sin categoría —</option>
+                {categories.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.nombre} ({c.claveProdServ} / {c.claveUnidad})
+                  </option>
+                ))}
+              </select>
+              {categories.length === 0 && (
+                <small className="muted">
+                  Aún no hay categorías. Crea una en <a href="/categories">Categorías</a>
+                  {' '}para heredar los códigos SAT automáticamente.
+                </small>
+              )}
             </div>
 
             <div className="form-group">

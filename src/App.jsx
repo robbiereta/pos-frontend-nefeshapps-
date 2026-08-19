@@ -18,6 +18,7 @@ import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
 import Cotizaciones from './pages/Cotizaciones';
 import Team from './pages/Team';
+import Categories from './pages/Categories';
 import RoleGuard from './components/RoleGuard';
 import NotesReceivable from './pages/NotesReceivable';
 import NotesPayable from './pages/NotesPayable';
@@ -316,6 +317,19 @@ function App() {
                 <NavbarModern />
                 <main className="main-content">
                   <Team />
+                </main>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <Categories />
                 </main>
               </RoleGuard>
             </ProtectedRoute>
