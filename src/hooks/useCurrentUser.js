@@ -6,13 +6,13 @@
 // mount, not on every interaction.
 //
 // Returns:
-//   { user, role, isOwner, isAdmin, can(allowedRoles) }
+//   { user, tenantRole, isOwner, isAdmin, can(allowedRoles) }
 //
 //     user         — the parsed localStorage object, or null
-//     role         — 'owner' | 'admin' | 'user' | 'viewer' | undefined
-//     isOwner      — true when role === 'owner'
-//     isAdmin      — true when role === 'admin' or 'owner'
-//     can(roles)   — true when the caller's role is in `roles`
+//     tenantRole   — 'owner' | 'admin' | 'user' | 'viewer' | undefined
+//     isOwner      — true when tenantRole === 'owner'
+//     isAdmin      — true when tenantRole === 'admin' or 'owner'
+//     can(roles)   — true when the caller's tenantRole is in `roles`
 import { useCallback, useState } from 'react';
 
 const readUser = () => {
@@ -29,14 +29,14 @@ export function useCurrentUser() {
   // Re-read on every render so a team-role change picked up by
   // the team list refresh immediately reflects in admin gating.
   const [user] = useState(() => readUser());
-  const role = user?.role;
-  const isOwner = role === 'owner';
-  const isAdmin = role === 'admin' || isOwner;
+  const tenantRole = user?.tenantRole;
+  const isOwner = tenantRole === 'owner';
+  const isAdmin = tenantRole === 'admin' || isOwner;
   const can = useCallback(
-    (allowed) => !allowed || allowed.length === 0 || (role && allowed.includes(role)),
-    [role]
+    (allowed) => !allowed || allowed.length === 0 || (tenantRole && allowed.includes(tenantRole)),
+    [tenantRole]
   );
-  return { user, role, isOwner, isAdmin, can };
+  return { user, tenantRole, isOwner, isAdmin, can };
 }
 
 export default useCurrentUser;

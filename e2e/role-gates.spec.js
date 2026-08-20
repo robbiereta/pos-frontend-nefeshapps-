@@ -13,7 +13,7 @@ const OWNER_USER = {
   email: 'owner@nefesh.local',
   username: 'owner',
   fullName: 'Owner Nefesh',
-  role: 'owner',
+  tenantRole: 'owner',
 };
 
 const CAJERO_USER = {
@@ -21,7 +21,7 @@ const CAJERO_USER = {
   email: 'cajero@nefesh.local',
   username: 'cajero',
   fullName: 'Ana Cajera',
-  role: 'user', // 'user' = cajero, gets bounced from admin pages
+  tenantRole: 'user', // 'user' = cajero, gets bounced from admin pages
 };
 
 async function setup(ctx, user) {

@@ -28,7 +28,7 @@ const initialForm = {
   email: '',
   username: '',
   password: '',
-  role: 'user',
+  tenantRole: 'user',
 };
 
 const statusPill = (member) => {
@@ -41,19 +41,19 @@ const statusPill = (member) => {
   return <span className="status-pill status-pill--inactive">Inactivo</span>;
 };
 
-const roleLabel = (role) => {
-  if (role === 'owner') return 'Propietario';
-  const found = ROLES.find((r) => r.value === role);
-  return found ? found.label : role;
+const roleLabel = (tenantRole) => {
+  if (tenantRole === 'owner') return 'Propietario';
+  const found = ROLES.find((r) => r.value === tenantRole);
+  return found ? found.label : tenantRole;
 };
 
 export default function Team() {
   const me = readUser();
   // The first user of a tenant is an 'admin' (was 'owner' in the
   // pre-restructure system; both roles still keep full team
-  // management). Sub-users (role='user' or 'viewer') see the page
-  // read-only.
-  const isOwner = me?.role === 'admin' || me?.role === 'owner';
+  // management). Sub-users (tenantRole='user' or 'viewer') see the
+  // page read-only.
+  const isOwner = me?.tenantRole === 'admin' || me?.tenantRole === 'owner';
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -107,7 +107,7 @@ export default function Team() {
   const onRoleChange = async (member) => {
     if (member.isOwner) return;
     try {
-      await teamService.update(member._id, { role: editRole });
+      await teamService.update(member._id, { tenantRole: editRole });
       setEditingId(null);
       await fetchMembers();
     } catch (e) {
@@ -202,14 +202,14 @@ export default function Team() {
             <label>
               <span>Rol</span>
               <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                value={form.tenantRole}
+                onChange={(e) => setForm({ ...form, tenantRole: e.target.value })}
               >
                 {ROLES.map((r) => (
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
-              <small className="form-help">{ROLES.find((r) => r.value === form.role)?.desc}</small>
+              <small className="form-help">{ROLES.find((r) => r.value === form.tenantRole)?.desc}</small>
             </label>
           </div>
           {formError && <div className="error-banner" role="alert">{formError}</div>}
@@ -270,10 +270,10 @@ export default function Team() {
                         onClick={() => {
                           if (!isOwner || m.isOwner) return;
                           setEditingId(m._id);
-                          setEditRole(m.role);
+                          setEditRole(m.tenantRole);
                         }}
                       >
-                        {roleLabel(m.role)}
+                        {roleLabel(m.tenantRole)}
                       </span>
                     )}
                   </td>

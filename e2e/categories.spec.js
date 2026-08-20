@@ -16,11 +16,11 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 const OWNER = {
   _id: 'u-owner-1', email: 'owner@nefesh.local', username: 'owner',
-  fullName: 'Owner Nefesh', role: 'owner',
+  fullName: 'Owner Nefesh', tenantRole: 'owner',
 };
 const CAJERO = {
   _id: 'u-cajero-1', email: 'cajero@nefesh.local', username: 'cajero',
-  fullName: 'Ana Cajera', role: 'user',
+  fullName: 'Ana Cajera', tenantRole: 'user',
 };
 
 const seed = (list) => list;

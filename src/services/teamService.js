@@ -29,21 +29,21 @@ export const teamService = {
     return json.data || [];
   },
 
-  async create({ username, email, password, fullName, role }) {
+  async create({ username, email, password, fullName, tenantRole }) {
     const res = await fetch(`${API_URL}/api/auth/team`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ username, email, password, fullName, role }),
+      body: JSON.stringify({ username, email, password, fullName, tenantRole }),
     });
     const json = await parseJson(res);
     return json.data;
   },
 
-  async update(id, { role, isActive, fullName }) {
+  async update(id, { tenantRole, isActive, fullName }) {
     const res = await fetch(`${API_URL}/api/auth/team/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify({ role, isActive, fullName }),
+      body: JSON.stringify({ tenantRole, isActive, fullName }),
     });
     const json = await parseJson(res);
     return json.data;

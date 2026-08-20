@@ -18,7 +18,7 @@ const ownerUser = {
   email: 'owner@nefesh.local',
   username: 'owner',
   fullName: 'Owner Nefesh',
-  role: 'owner',
+  tenantRole: 'owner',
 };
 
 const subUser = {
@@ -26,7 +26,7 @@ const subUser = {
   email: 'cajero@nefesh.local',
   username: 'cajero',
   fullName: 'Ana Cajera',
-  role: 'user',
+  tenantRole: 'user',
   isActive: true,
   isOwner: false,
   lastLogin: new Date().toISOString(),
@@ -144,7 +144,7 @@ test.describe('Team management — owner view', () => {
       email: 'beto@empresa.com',
       fullName: 'Beto Vendedor',
       username: 'beto',
-      role: 'user',
+      tenantRole: 'user',
     });
 
     // The new member is visible
@@ -211,7 +211,7 @@ test.describe('Team management — owner view', () => {
 
 test.describe('Team management — non-owner view', () => {
   test('sub-user sees the team list but no invite button', async ({ page, context }) => {
-    const me = { _id: 'u-sub-1', email: 'cajero@nefesh.local', username: 'cajero', fullName: 'Ana Cajera', role: 'user' };
+    const me = { _id: 'u-sub-1', email: 'cajero@nefesh.local', username: 'cajero', fullName: 'Ana Cajera', tenantRole: 'user' };
     await setupAuth(context, me);
     await context.route('**/api/auth/team', (route) =>
       route.fulfill({

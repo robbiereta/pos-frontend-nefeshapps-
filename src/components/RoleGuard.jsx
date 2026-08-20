@@ -1,9 +1,10 @@
-// Role-based route guard.
+// Tenant-role-based route guard.
 //
-// Reads the role from localStorage.user (set on login) and either
-// renders the children or redirects to /. The backend enforces the
-// same rules with its `requireRole` middleware; this is a UX
-// shortcut so sub-users don't see "403" pages in the first place.
+// Reads the tenantRole from localStorage.user (set on login) and
+// either renders the children or redirects to /. The backend
+// enforces the same rules with its `requireRole` middleware; this
+// is a UX shortcut so sub-users don't see "403" pages in the
+// first place.
 //
 // Usage in App.jsx:
 //   <Route element={<RoleGuard allow={['owner', 'admin']} />}>
@@ -35,12 +36,12 @@ export default function RoleGuard({ allow, children }) {
     return children;
   }
 
-  // `role` on the user object is the tenantRole returned by the
-  // backend's team endpoints. Fall back to 'owner' for the very
-  // first login before the team list is fetched — the backend
-  // still enforces the real check on every request.
-  const role = user.role || 'owner';
-  if (!allow.includes(role)) {
+  // The login response sets user.tenantRole on the stored user
+  // object. Fall back to 'admin' for the very first login before
+  // the role is loaded — the backend still enforces the real
+  // check on every request.
+  const tenantRole = user.tenantRole || 'admin';
+  if (!allow.includes(tenantRole)) {
     return <Navigate to="/" replace />;
   }
 
