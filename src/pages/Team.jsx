@@ -28,7 +28,7 @@ const initialForm = {
   email: '',
   username: '',
   password: '',
-  role: 'user',
+  role: 'admin',
 };
 
 const statusPill = (member) => {
