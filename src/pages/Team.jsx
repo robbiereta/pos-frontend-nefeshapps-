@@ -28,7 +28,7 @@ const initialForm = {
   email: '',
   username: '',
   password: '',
-  role: 'admin',
+  role: 'user',
 };
 
 const statusPill = (member) => {
@@ -49,7 +49,11 @@ const roleLabel = (role) => {
 
 export default function Team() {
   const me = readUser();
-  const isOwner = me?.role === 'owner' || me?.role === undefined;
+  // The first user of a tenant is an 'admin' (was 'owner' in the
+  // pre-restructure system; both roles still keep full team
+  // management). Sub-users (role='user' or 'viewer') see the page
+  // read-only.
+  const isOwner = me?.role === 'admin' || me?.role === 'owner';
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

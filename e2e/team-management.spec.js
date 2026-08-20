@@ -81,10 +81,9 @@ test.describe('Team management — owner view', () => {
     expect(await page.locator('text=Propietario').first().isVisible()).toBe(true);
   });
 
-  test('new sub-user defaults to the admin role when none is selected', async ({ page, context }) => {
+  test('new sub-user defaults to the user (cajero) role when none is selected', async ({ page, context }) => {
     await setupAuth(context, ownerUser);
     let list = [ownerRendered];
-    let created = null;
     await context.route('**/api/auth/team', (route) => {
       if (route.request().method() === 'GET') {
         return route.fulfill({
@@ -92,26 +91,14 @@ test.describe('Team management — owner view', () => {
           body: JSON.stringify({ success: true, data: list }),
         });
       }
-      if (route.request().method() === 'POST') {
-        const body = JSON.parse(route.request().postData() || '{}');
-        created = body;
-        const newMember = {
-          _id: 'u-new', ...body, isActive: true, isOwner: false,
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-        };
-        list = [...list, newMember];
-        return route.fulfill({
-          status: 201, contentType: 'application/json',
-          body: JSON.stringify({ success: true, data: newMember }),
-        });
-      }
+      return route.fallback();
     });
     await visit(page, '/team');
     await page.getByRole('button', { name: /Invitar usuario/ }).click();
-    // The role select starts on the first option of the dropdown —
-    // which should now be 'admin' (the new default for sub-users).
+    // The role select starts on 'user' (cajero) — the owner can
+    // promote to 'admin' or 'viewer' from the dropdown if needed.
     const roleSelect = page.locator('select').first();
-    await expect(roleSelect).toHaveValue('admin');
+    await expect(roleSelect).toHaveValue('user');
   });
 
   test('owner can open the invite form and submit a new user', async ({ page, context }) => {
