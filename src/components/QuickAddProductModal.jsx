@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { productService } from '../services/productService';
+import { categoryService } from '../services/categoryService';
 import { useToast } from './ui/Toast.jsx';
 import './Modal.css';
 
@@ -89,9 +90,52 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
   };
 
   // ── Create tab ─────────────────────────────────────────────────────────
-  const initialCreate = { nombre: '', sku: '', precioVenta: '', categoria: 'General', claveUnidad: 'E48', claveProdServ: '01010101' };
+  const initialCreate = {
+    nombre: '',
+    sku: '',
+    precioVenta: '',
+    categoria: 'General',
+    categoriaId: '',
+    claveUnidad: 'E48',
+    claveProdServ: '01010101',
+  };
   const [formData, setFormData] = useState(initialCreate);
   const [formErrors, setFormErrors] = useState({});
+  const [categories, setCategories] = useState([]);
+
+  // Fetch the tenant's active categories once when the modal opens.
+  // Mirrors ProductModal: the user picks a category and the SAT
+  // codes auto-fill (the backend re-applies the inheritance at
+  // write time so a category rename in admin doesn't mutate
+  // historical product SAT codes).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await categoryService.list({ includeInactive: false });
+        if (!cancelled) setCategories(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setCategories([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const onCategoryChange = (catId) => {
+    if (!catId) {
+      setFormData((s) => ({ ...s, categoriaId: '', categoria: 'General' }));
+      return;
+    }
+    const cat = categories.find((c) => c._id === catId);
+    if (!cat) return;
+    setFormData((s) => ({
+      ...s,
+      categoriaId: cat._id,
+      categoria: cat.nombre,
+      claveProdServ: cat.claveProdServ,
+      claveUnidad: cat.claveUnidad,
+    }));
+  };
 
   const handleCreateChange = (e) => {
     const { name, value } = e.target;
@@ -120,6 +164,10 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
     try {
       const payload = {
         ...formData,
+        // Don't send an empty string for categoriaId — the backend
+        // helper short-circuits on truthy values and we'd rather
+        // have `undefined` so the existing categoria string stays.
+        categoriaId: formData.categoriaId || undefined,
         precioVenta: parseFloat(formData.precioVenta),
         // also keep legacy field for backends that still read it
         precioUnitario: parseFloat(formData.precioVenta),
@@ -150,6 +198,11 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
     setTab('create');
     setSelectedProduct(null);
     setFormData({ ...initialCreate, nombre: query });
+  };
+
+  const resetCreate = () => {
+    setFormData({ ...initialCreate });
+    setFormErrors({});
   };
 
   return (
@@ -366,16 +419,28 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                   </div>
                   <div>
                     <label style={labelStyle}>Categoría</label>
-                    <input
-                      type="text"
-                      name="categoria"
-                      value={formData.categoria}
-                      onChange={handleCreateChange}
-                      placeholder="Ej: Comida"
+                    <select
+                      name="categoriaId"
+                      value={formData.categoriaId || ''}
+                      onChange={(e) => onCategoryChange(e.target.value)}
                       style={inputStyle}
-                    />
+                    >
+                      <option value="">— General (sin categoría) —</option>
+                      {categories.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.nombre} ({c.claveProdServ} / {c.claveUnidad})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
+                {categories.length === 0 && (
+                  <small style={{ color: '#666', fontSize: '11px', marginTop: '-4px' }}>
+                    Aún no hay categorías. Crea una en
+                    {' '}<a href="/categories" target="_blank" rel="noreferrer">Categorías</a>
+                    {' '}para heredar los códigos SAT automáticamente.
+                  </small>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
@@ -404,17 +469,31 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                   </div>
                 </div>
 
-                <div>
-                  <label style={labelStyle}>Clave SAT (claveProdServ)</label>
-                  <input
-                    type="text"
-                    name="claveProdServ"
-                    value={formData.claveProdServ}
-                    onChange={handleCreateChange}
-                    placeholder="01010101"
-                    style={inputStyle}
-                    maxLength={8}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>Clave SAT producto (8 dígitos)</label>
+                    <input
+                      type="text"
+                      name="claveProdServ"
+                      value={formData.claveProdServ}
+                      onChange={handleCreateChange}
+                      placeholder="01010101"
+                      style={inputStyle}
+                      maxLength={8}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Clave unidad SAT</label>
+                    <input
+                      type="text"
+                      name="claveUnidad"
+                      value={formData.claveUnidad}
+                      onChange={handleCreateChange}
+                      placeholder="E48 / H87"
+                      style={inputStyle}
+                      maxLength={3}
+                    />
+                  </div>
                 </div>
 
                 {formErrors.form && (
