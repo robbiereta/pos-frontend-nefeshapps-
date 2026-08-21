@@ -55,21 +55,104 @@
   margin-left: var(--space-2);
 }
 
-/* Section grouping inside the primary nav (Operación | Finanzas | Sistema). */
-.navbar-modern__section {
+/* Section grouping inside the primary nav (Operación | Finanzas | Sistema).
+   Each section is now a clickable dropdown: a trigger button with a
+   caret opens a panel of items below it. Hover also opens the panel
+   so desktop users can flick through sections without clicking. */
+.nav-dropdown {
+  position: relative;
   display: flex;
   align-items: center;
+}
+.nav-dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
+  padding: 0.5rem 0.875rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--neutral-600);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+  font-family: inherit;
 }
-.navbar-modern__divider {
-  width: 1px;
-  height: 22px;
-  background: var(--border-subtle);
-  margin: 0 var(--space-2);
-  flex-shrink: 0;
+.nav-dropdown__trigger:hover,
+.nav-dropdown.is-open .nav-dropdown__trigger {
+  background: var(--neutral-100);
+  color: var(--neutral-900);
 }
+.nav-dropdown.is-current > .nav-dropdown__trigger {
+  color: var(--brand-700);
+  background: var(--brand-50);
+}
+.nav-dropdown__caret {
+  font-size: 10px;
+  line-height: 1;
+  margin-top: 1px;
+  transition: transform var(--duration-fast) var(--ease-standard);
+  opacity: 0.7;
+}
+.nav-dropdown.is-open .nav-dropdown__caret {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+.nav-dropdown__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.18),
+              0 2px 6px rgba(15, 23, 42, 0.06);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity var(--duration-fast) var(--ease-standard),
+              transform var(--duration-fast) var(--ease-standard),
+              visibility var(--duration-fast) var(--ease-standard);
+  z-index: calc(var(--z-nav) + 1);
+}
+.nav-dropdown.is-open .nav-dropdown__panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.nav-dropdown__item {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--neutral-700);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease-standard),
+              color var(--duration-fast) var(--ease-standard);
+}
+.nav-dropdown__item:hover {
+  background: var(--neutral-100);
+  color: var(--neutral-900);
+}
+.nav-dropdown__item.active {
+  background: var(--brand-50);
+  color: var(--brand-700);
+}
+
 .navbar-modern__section-labels {
-  display: none; /* desktop hides section labels — the divider is the signal */
+  display: none; /* desktop hides section labels — the dropdown trigger is the signal */
 }
 
 .nav-link {
@@ -183,35 +266,38 @@
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
     padding: var(--space-3);
-    gap: var(--space-1);
+    gap: var(--space-2);
     box-shadow: var(--shadow-md);
     z-index: var(--z-nav);
+    max-height: calc(100vh - var(--navbar-height));
+    overflow-y: auto;
   }
-  .navbar-modern__primary.open .nav-link {
-    width: 100%;
-    padding: 0.75rem 1rem;
-  }
-  .navbar-modern__primary.open .navbar-modern__divider { display: none; }
-  .navbar-modern__primary.open .navbar-modern__section {
+  /* On mobile, the dropdown panels become inline accordions under
+     each trigger instead of floating popovers. */
+  .navbar-modern__primary.open .nav-dropdown {
     flex-direction: column;
     align-items: stretch;
-    gap: 0;
     width: 100%;
   }
-  .navbar-modern__primary.open .navbar-modern__section-labels {
-    display: block;
+  .navbar-modern__primary.open .nav-dropdown__trigger {
     width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--neutral-50);
   }
-  .navbar-modern__section-label {
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--neutral-500);
-    padding: var(--space-2) 0 var(--space-1) 0;
-    border-top: 1px solid var(--border-subtle);
-    margin-top: var(--space-2);
+  .navbar-modern__primary.open .nav-dropdown__panel {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 0.25rem 0 0.5rem 0.5rem;
+    min-width: 0;
   }
-  .navbar-modern__section-label:first-child { border-top: 0; margin-top: 0; }
+  .navbar-modern__primary.open .nav-dropdown__item {
+    padding: 0.65rem 1rem;
+  }
   .user-chip__email { display: none; }
 }
