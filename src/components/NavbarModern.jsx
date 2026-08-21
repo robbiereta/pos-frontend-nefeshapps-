@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authService } from '../services/api';
 import '../styles/navbar.css';
 
-// Each nav item lives in exactly one section. Section order = visual order
-// left → right. Sections render with a thin divider between them on desktop
-// and stack as labelled groups on the mobile sheet.
+// Each nav item lives in exactly one section. Sections render as
+// dropdowns (Operación / Finanzas / Sistema) on desktop and stack
+// as labelled groups on the mobile sheet.
 const NAV_SECTIONS = [
   {
     id: 'operacion',
@@ -47,7 +47,9 @@ function initials(email) {
 }
 
 export default function NavbarModern() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);                  // mobile sheet
+  const [openSection, setOpenSection] = useState(null);     // desktop dropdown
+  const navRef = useRef(null);
   const location = useLocation();
   const user = authService.getCurrentUser();
 
@@ -60,38 +62,92 @@ export default function NavbarModern() {
     location.pathname === path
     || (path !== '/dashboard' && location.pathname.startsWith(path));
 
-  // Flatten once for the legacy "any link active" check used by the mobile toggle.
-  const flatItems = useMemo(() => NAV_SECTIONS.flatMap(s => s.items), []);
+  // A section is considered "current" if the active route lives in it.
+  const activeSectionId = useMemo(() => {
+    for (const section of NAV_SECTIONS) {
+      if (section.items.some((it) => isActive(it.path))) return section.id;
+    }
+    return null;
+  }, [location.pathname]);
+
+  // Click-outside closes any open dropdown. The mobile sheet (`open`)
+  // has its own toggle button so we don't auto-close it here.
+  useEffect(() => {
+    if (openSection === null) return undefined;
+    const handleClick = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target)) {
+        setOpenSection(null);
+      }
+    };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setOpenSection(null);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [openSection]);
+
+  // Auto-close the dropdown on route change.
+  useEffect(() => {
+    setOpenSection(null);
+    setOpen(false);
+  }, [location.pathname]);
+
+  const toggleSection = (id) => {
+    setOpenSection((cur) => (cur === id ? null : id));
+  };
 
   return (
-    <header className="navbar-modern" role="banner">
-      <Link to="/dashboard" className="navbar-modern__brand" onClick={() => setOpen(false)}>
+    <header className="navbar-modern" role="banner" ref={navRef}>
+      <Link to="/dashboard" className="navbar-modern__brand" onClick={() => { setOpen(false); setOpenSection(null); }}>
         <span className="navbar-modern__brand-mark" aria-hidden>N</span>
         <span>Nefesh</span>
       </Link>
 
       <nav className={`navbar-modern__primary ${open ? 'open' : ''}`} aria-label="Principal">
-        {NAV_SECTIONS.map((section, sIdx) => (
-          <React.Fragment key={section.id}>
-            {sIdx > 0 && <span className="navbar-modern__divider" aria-hidden />}
-            <div className="navbar-modern__section" data-section={section.id}>
-              {section.items.map(item => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
-                  onClick={() => setOpen(false)}
-                >
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+        {NAV_SECTIONS.map((section) => {
+          const isOpen = openSection === section.id;
+          const isCurrent = activeSectionId === section.id;
+          return (
+            <div
+              key={section.id}
+              className={`nav-dropdown ${isOpen ? 'is-open' : ''} ${isCurrent ? 'is-current' : ''}`}
+              data-section={section.id}
+            >
+              <button
+                type="button"
+                className="nav-dropdown__trigger"
+                aria-expanded={isOpen}
+                aria-haspopup="menu"
+                onClick={() => toggleSection(section.id)}
+              >
+                <span>{section.label}</span>
+                <span className="nav-dropdown__caret" aria-hidden>▾</span>
+              </button>
+              <div className="nav-dropdown__panel" role="menu">
+                {section.items.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    role="menuitem"
+                    className={`nav-dropdown__item ${isActive(item.path) ? 'active' : ''}`}
+                    onClick={() => { setOpenSection(null); setOpen(false); }}
+                  >
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </React.Fragment>
-        ))}
-        {/* Mobile-only section labels */}
+          );
+        })}
+
+        {/* Mobile-only section labels (visible when the hamburger is open) */}
         {open && (
           <div className="navbar-modern__section-labels">
-            {NAV_SECTIONS.map(section => (
+            {NAV_SECTIONS.map((section) => (
               <div key={section.id} className="navbar-modern__section-label">
                 {section.label}
               </div>
