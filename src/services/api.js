@@ -16,24 +16,34 @@ export async function request(endpoint, options = {}) {
     headers,
   });
 
-  if (response.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
-  }
-
+  // Read the body FIRST so the actual server message (e.g.
+  // "Credenciales inválidas") can surface in the thrown error
+  // — the user shouldn't see a generic "Unauthorized" toast when
+  // the backend already told us what went wrong.
   let data;
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {
-    data = await response.json();
+    data = await response.json().catch(() => null);
   } else {
-    const text = await response.text();
+    const text = await response.text().catch(() => '');
     throw new Error(`Expected JSON but got ${contentType || 'text'}: ${text.substring(0, 100)}`);
   }
 
+  if (response.status === 401) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    // For the login endpoint itself (or any request initiated from
+    // the /login page) we skip the hard redirect so the page's
+    // catch handler can show a meaningful error toast. The user is
+    // already where they need to be.
+    if (endpoint !== '/api/auth/login' && !window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+    throw new Error(data?.message || 'Sesión expirada. Inicia sesión de nuevo.');
+  }
+
   if (!response.ok) {
-    throw new Error(data.message || `Request failed with status ${response.status}`);
+    throw new Error(data?.message || `Request failed with status ${response.status}`);
   }
   return data;
 }

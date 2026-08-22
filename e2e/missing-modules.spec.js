@@ -81,14 +81,13 @@ test.describe('Login / Register', () => {
   });
 
   test('login shows error toast on bad credentials', async ({ page }) => {
-    // Stub a 500 (not 401) so the api.js request helper actually
-    // reads the response body and surfaces the message. The 401
-    // branch in api.js does a hard redirect to /login and throws
-    // a generic "Unauthorized" before the body is read, which is
-    // a separate UX bug worth fixing later.
+    // With the fix in services/api.js, the request helper now
+    // reads the response body BEFORE the 401 redirect, so the
+    // user sees the actual message instead of a generic
+    // "Unauthorized" toast.
     await page.route('**/api/auth/login', (route) =>
       route.fulfill({
-        status: 500, contentType: 'application/json',
+        status: 401, contentType: 'application/json',
         body: JSON.stringify({ message: 'Credenciales inválidas' }),
       }),
     );
@@ -331,14 +330,12 @@ test.describe('ClientsPage', () => {
     expect(postedBody.rfc).toBe('GAM030303CCC');
     expect(postedBody.nombre).toBe('Gamma SC');
 
-    // The form then throws because ClientsPage's handleSubmit uses
-    // a `toast` helper that was never imported (pre-existing bug —
-    // the page calls toast.success('Cliente creado') but `toast`
-    // is undefined, so the form hits the catch and surfaces
-    // "toast is not defined" in the error banner). The POST itself
-    // succeeded, which is what this test verifies. Tracking the
-    // list refresh + form reset as a separate fix.
-    await expect(page.getByText(/toast is not defined|Error al guardar cliente/i).first()).toBeVisible({ timeout: 5000 });
+    // With the fix in ClientsPage (imports useToast), the form now
+    // closes + the list refreshes. The success toast should appear
+    // and the new client should be visible in the table.
+    await expect(page.getByRole('cell', { name: 'Gamma SC' })).toBeVisible({ timeout: 5000 });
+    // The form should be closed (no more inputs)
+    await expect(page.locator('input[name="rfc"]')).toHaveCount(0);
   });
 
   test('delete client confirms via window.confirm and calls DELETE', async ({ page, context }) => {
@@ -441,18 +438,12 @@ test.describe('CashDrawer', () => {
 // ─────────────────────────────────────────────────────────────────
 // ApiTest (admin/owner only)
 //
-// NOTE: /api-test can't be reached in `vite dev` because the dev
-// proxy matches `/api` as a prefix and forwards the request to the
-// backend (port 5002, which isn't running in CI). This is a
-// vite.config.js dev-only issue — the path is correctly served by
-// the React Router in production builds (vite build + nginx).
-// The role-gates spec already documents this and excludes /api-test.
-//
-// The two tests below are kept in the file as a `test.skip` so
-// they can be re-enabled when the dev proxy is fixed (e.g. by
-// narrowing the proxy from `/api` to `/api/.*`).
+// Now reachable in `vite dev` because the dev proxy was narrowed
+// from `/api` (prefix) to `/api/` (slash-required) — /api-test is
+// a SPA route, not a backend endpoint, so it must be served by
+// the React Router.
 // ─────────────────────────────────────────────────────────────────
-test.describe.skip('ApiTest (skipped — vite dev proxy intercepts /api-test)', () => {
+test.describe('ApiTest', () => {
   test('admin can open /api-test, the page renders the test buttons', async ({ page, context }) => {
     await setupAuth(context);
     await stubTeamList(context);

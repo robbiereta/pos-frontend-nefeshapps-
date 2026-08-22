@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { clientService } from '../services/api';
+import { useToast } from '../components/ui/Toast.jsx';
 import './ClientsPage.css';
 
 export default function ClientsPage() {
+  const toast = useToast();
   const [clients, setClients] = useState([]);
   const [displayedClients, setDisplayedClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
