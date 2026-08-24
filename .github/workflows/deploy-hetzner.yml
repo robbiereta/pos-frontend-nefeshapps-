@@ -1,17 +1,14 @@
 name: Deploy to Hetzner (manual)
 
 # ============================================================
-# Manual deploy with tag/env selection. Same SSH+pull+compose
-# flow as deploy-prod.yml / deploy-staging.yml, but with
-# workflow_dispatch inputs so you can:
-#   - pick a tag from the existing images in GHCR
-#   - pick the env (prod / staging)
-#   - force a re-pull of an existing tag
+# Manual deploy with env selection. Same build → save → scp →
+# load pipeline as deploy-prod.yml / deploy-staging.yml.
+# Works without GHCR access (private package friendly).
 #
-# Useful for:
-#   - redeploying a previous SHA without rebuilding
-#   - promoting a specific commit between envs
-#   - smoke-testing a fix
+# Inputs:
+#   environment — prod or staging
+#   image_tag   — logical label for the loaded image (default:
+#                 manual-<short-sha>)
 # ============================================================
 
 on:
@@ -25,116 +22,159 @@ on:
         options:
           - production
           - staging
-      tag:
-        description: "Image tag to deploy (sha-<commit> or branch name)"
+      image_tag:
+        description: "Logical label for the loaded image (overrides the default manual-<sha>)"
         type: string
-        required: true
-        default: "latest"
-      force_pull:
-        description: "Always pull even if image is cached locally"
-        type: boolean
-        default: true
+        required: false
+        default: ""
 
 concurrency:
   group: deploy-hetzner-manual
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  packages: read
-
-env:
-  IMAGE_NAME: ghcr.io/robbiereta/pos-frontend
-
 jobs:
-  deploy:
-    name: SSH · pull · compose up
+  build:
+    name: Build image & SCP to server
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: ${{ inputs.environment }}
 
     steps:
-      - name: Setup SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (always rebuilds from current branch)
+        env:
+          ENV: ${{ inputs.environment }}
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          # The compose file expects a specific local tag depending on env.
+          # We always build once and tag it twice (or more) so it can be
+          # loaded on the server with the right name.
+          case "${ENV}" in
+            production) PRIMARY_TAG="latest" ;;
+            staging)    PRIMARY_TAG="staging" ;;
+            *) echo "::error::unknown env: ${ENV}"; exit 1 ;;
+          esac
+          if [ -n "${TAG}" ]; then
+            CUSTOM_TAG="${TAG}"
+          else
+            CUSTOM_TAG="manual-${PRIMARY_TAG}-${{ github.sha }}"
+          fi
+          echo "PRIMARY_TAG=${PRIMARY_TAG}" >> "$GITHUB_ENV"
+          echo "CUSTOM_TAG=${CUSTOM_TAG}"  >> "$GITHUB_ENV"
+
+          docker buildx build --load \
+            --tag "nefeshapps-pos-frontend:${PRIMARY_TAG}" \
+            --tag "nefeshapps-pos-frontend:${CUSTOM_TAG}" \
+            --tag "nefeshapps-pos-frontend:sha-${{ github.sha }}" \
+            .
+
+      - name: Save image to tarball
+        env:
+          PRIMARY_TAG: ${{ env.PRIMARY_TAG }}
+        run: |
+          docker save "nefeshapps-pos-frontend:${PRIMARY_TAG}" | gzip > /tmp/image.tar.gz
+          ls -la /tmp/image.tar.gz
+
+      - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
-      - name: Resolve env-specific paths
-        id: paths
-        env:
-          ENV: ${{ inputs.environment }}
-        run: |
-          case "${ENV}" in
-            production)
-              echo "deploy_dir=/nefeshapps"       >> "$GITHUB_OUTPUT"
-              echo "compose_file=docker-compose.yml" >> "$GITHUB_OUTPUT"
-              echo "container=nefeshapps-pos-frontend" >> "$GITHUB_OUTPUT"
-              echo "image_tag=latest"             >> "$GITHUB_OUTPUT"
-              ;;
-            staging)
-              echo "deploy_dir=/nefeshapps/staging"   >> "$GITHUB_OUTPUT"
-              echo "compose_file=docker-compose.staging.yml" >> "$GITHUB_OUTPUT"
-              echo "container=nefeshapps-pos-frontend-staging" >> "$GITHUB_OUTPUT"
-              echo "image_tag=staging"              >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "::error::Unknown environment: ${ENV}"
-              exit 1
-              ;;
-          esac
+      - name: SCP image to Hetzner
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          username: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "/tmp/image.tar.gz"
+          target: "/tmp/image-manual-${{ github.sha }}.tar.gz"
+
+  deploy:
+    name: SSH · load · compose up
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
       - name: Deploy on Hetzner
         env:
           HETZNER_HOST:  ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
           HETZNER_USER:  ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
-          IMAGE_NAME:    ${{ env.IMAGE_NAME }}
-          TAG:           ${{ inputs.tag }}
-          FORCE_PULL:    ${{ inputs.force_pull }}
-          GHCR_USER:     ${{ github.actor }}
-          GHCR_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
-          DEPLOY_DIR:    ${{ steps.paths.outputs.deploy_dir }}
-          COMPOSE_FILE:  ${{ steps.paths.outputs.compose_file }}
-          CONTAINER:     ${{ steps.paths.outputs.container }}
+          ENV:           ${{ inputs.environment }}
+          PRIMARY_TAG:   ${{ env.PRIMARY_TAG }}
+          CUSTOM_TAG:    ${{ env.CUSTOM_TAG }}
         run: |
           set -euo pipefail
-          FULL_TAG="${IMAGE_NAME}:${TAG}"
-          echo "Deploying ${FULL_TAG} → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR}"
+          case "${ENV}" in
+            production)
+              DEPLOY_DIR="/nefeshapps"
+              COMPOSE="docker-compose.yml"
+              CONTAINER="nefeshapps-pos-frontend"
+              ;;
+            staging)
+              DEPLOY_DIR="/nefeshapps/staging"
+              COMPOSE="docker-compose.staging.yml"
+              CONTAINER="nefeshapps-pos-frontend-staging"
+              ;;
+            *) echo "::error::unknown env: ${ENV}"; exit 1 ;;
+          esac
+          TARBALL="/tmp/image-manual-${{ github.sha }}.tar.gz"
+          echo "Manual deploy → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR} (env=${ENV}, primary_tag=${PRIMARY_TAG})"
 
           ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
-              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
-              "${FULL_TAG}" "${CONTAINER}" \
-              "${GHCR_USER}" "${GHCR_TOKEN}" \
-              "${FORCE_PULL}" \
+              "${TARBALL}" "${DEPLOY_DIR}" "${COMPOSE}" \
+              "${PRIMARY_TAG}" "${CONTAINER}" \
+              "${CUSTOM_TAG}" \
             << 'REMOTE_SCRIPT'
           set -euo pipefail
+          TARBALL="$1"; shift
           DEPLOY_DIR="$1"; shift
-          COMPOSE_FILE="$1"; shift
-          FULL_TAG="$1"; shift
+          COMPOSE="$1"; shift
+          PRIMARY_TAG="$1"; shift
           CONTAINER="$1"; shift
-          GHCR_USER="$1"; shift
-          GHCR_TOKEN="$1"; shift
-          FORCE_PULL="$1"; shift
+          CUSTOM_TAG="$1"; shift
 
-          echo "→ Login to GHCR (one-shot)"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin >/dev/null
+          echo "→ mkdir -p ${DEPLOY_DIR}"
+          mkdir -p "${DEPLOY_DIR}"
 
+          echo "→ cd ${DEPLOY_DIR}"
           cd "${DEPLOY_DIR}"
 
-          if [ "${FORCE_PULL}" = "true" ]; then
-            echo "→ docker pull ${FULL_TAG} (force)"
-            docker pull "${FULL_TAG}"
-          else
-            # Check if image exists locally first
-            if docker image inspect "${FULL_TAG}" >/dev/null 2>&1; then
-              echo "→ image present locally, skipping pull"
-            else
-              echo "→ docker pull ${FULL_TAG}"
-              docker pull "${FULL_TAG}"
-            fi
+          echo "→ ensure ${COMPOSE} is in place"
+          if [ ! -f "${COMPOSE}" ]; then
+            echo "::error::${COMPOSE} missing in ${DEPLOY_DIR} on the server"
+            exit 1
           fi
 
-          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
-          docker compose -f "${COMPOSE_FILE}" up -d --build
+          echo "→ docker load -i ${TARBALL}"
+          docker load -i "${TARBALL}"
+
+          echo "→ re-tag to :${PRIMARY_TAG} (the compose file expects this)"
+          docker tag "nefeshapps-pos-frontend:${PRIMARY_TAG}" \
+                     "nefeshapps-pos-frontend:${PRIMARY_TAG}"
+          if [ -n "${CUSTOM_TAG}" ]; then
+            docker tag "nefeshapps-pos-frontend:${PRIMARY_TAG}" \
+                       "nefeshapps-pos-frontend:${CUSTOM_TAG}"
+          fi
+
+          echo "→ docker compose -f ${COMPOSE} up -d --build"
+          docker compose -f "${COMPOSE}" up -d --build
+
+          echo "→ docker image prune -f"
+          docker image prune -f
+
+          echo "→ cleanup local tarball"
+          rm -f "${TARBALL}"
 
           echo "→ container status"
           docker ps --filter "name=${CONTAINER}" \
@@ -151,7 +191,8 @@ jobs:
         run: |
           echo "## 🚀 Manual deploy" >> $GITHUB_STEP_SUMMARY
           echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tag: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Primary tag: ${{ env.PRIMARY_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Custom tag:  ${{ env.CUSTOM_TAG }}" >> $GITHUB_STEP_SUMMARY
           echo "- Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure
@@ -160,4 +201,4 @@ jobs:
           echo "::error::Manual deploy failed"
           echo "## 🚨 Manual deploy FAILED" >> $GITHUB_STEP_SUMMARY
           echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tag: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Primary tag: ${{ env.PRIMARY_TAG }}" >> $GITHUB_STEP_SUMMARY

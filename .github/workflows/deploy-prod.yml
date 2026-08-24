@@ -3,24 +3,17 @@ name: Deploy to Production
 # ============================================================
 # Auto-deploy to production on push to master.
 #
-# Pipeline:
-#   1. Build the Docker image (Vite build inside the image)
-#   2. Push to GitHub Container Registry (ghcr.io)
-#      - tagged :latest AND :sha-<short-sha>
-#   3. SSH to the Hetzner box
-#   4. `docker login ghcr.io` (one-shot)
-#   5. `docker pull` the new sha-tagged image
-#   6. Re-tag to :latest so the compose file picks it up
-#   7. `docker compose up -d --build`
-#   8. Prune dangling images
+# Pipeline (no GHCR pull needed — works with private packages):
+#   1. Build the image with docker buildx
+#   2. Save to /tmp/image.tar.gz in the runner
+#   3. SCP the tarball to /tmp/ on the Hetzner box
+#   4. SSH in: docker load + re-tag + docker compose up
+#   5. Prune dangling images
 #
 # Required GitHub Secrets:
 #   HETZNER_SSH_KEY — ed25519 private key authorized on the server
-#   HETZNER_HOST    — server IP (default 204.168.163.106, override via secret/var)
-#   HETZNER_USER    — SSH user (default root, override via secret/var)
-#
-# GITHUB_TOKEN is auto-provided by GitHub Actions and has packages:write
-# permission for GHCR pushes (see permissions block below).
+#   HETZNER_HOST    — server IP (default 204.168.163.106)
+#   HETZNER_USER    — SSH user (default root)
 # ============================================================
 
 on:
@@ -41,20 +34,15 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  packages: write
-
 env:
-  IMAGE_NAME:   ghcr.io/robbiereta/pos-frontend
-  TAG_LATEST:   latest
-  TAG_SHA:      sha-${{ github.sha }}
-  DEPLOY_DIR:   /nefeshapps
-  COMPOSE_FILE: docker-compose.yml
+  IMAGE_TAG:  latest
+  DEPLOY_DIR: /nefeshapps
+  COMPOSE:    docker-compose.yml
+  CONTAINER:  nefeshapps-pos-frontend
 
 jobs:
-  build-and-push:
-    name: Build image & push to GHCR
+  build:
+    name: Build image & SCP to server
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -62,94 +50,102 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
+      - name: Build image
+        run: |
+          docker buildx build --load \
+            --tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
+            --tag "nefeshapps-pos-frontend:sha-${{ github.sha }}" \
+            .
+
+      - name: Save image to tarball
+        run: |
+          docker save "nefeshapps-pos-frontend:${IMAGE_TAG}" | gzip > /tmp/image.tar.gz
+          ls -la /tmp/image.tar.gz
+          echo "  size: $(du -h /tmp/image.tar.gz | cut -f1)"
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
-            ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: SCP image to Hetzner
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          username: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "/tmp/image.tar.gz"
+          target: "/tmp/image-${{ github.sha }}.tar.gz"
 
   deploy:
-    name: SSH · pull · compose up
+    name: SSH · load · compose up
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: build-and-push
+    needs: build
     environment: production
 
     steps:
-      - name: Setup SSH
+      - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
       - name: Deploy on Hetzner
         env:
-          HETZNER_HOST:    ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
-          HETZNER_USER:    ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
-          IMAGE_NAME:      ${{ env.IMAGE_NAME }}
-          TAG_SHA:         ${{ env.TAG_SHA }}
-          TAG_LATEST:      ${{ env.TAG_LATEST }}
-          DEPLOY_DIR:      ${{ env.DEPLOY_DIR }}
-          COMPOSE_FILE:    ${{ env.COMPOSE_FILE }}
-          GHCR_USER:       ${{ github.actor }}
-          GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+          IMAGE_TAG:   ${{ env.IMAGE_TAG }}
+          DEPLOY_DIR:  ${{ env.DEPLOY_DIR }}
+          COMPOSE:     ${{ env.COMPOSE }}
+          CONTAINER:   ${{ env.CONTAINER }}
+          IMAGE_SHA:   sha-${{ github.sha }}
         run: |
           set -euo pipefail
-          FULL_SHA="${IMAGE_NAME}:${TAG_SHA}"
-          FULL_LATEST="${IMAGE_NAME}:${TAG_LATEST}"
-          echo "Deploying ${FULL_SHA} → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR}"
+          TARBALL="/tmp/image-${{ github.sha }}.tar.gz"
+          echo "Loading $TARBALL on $HETZNER_USER@$HETZNER_HOST"
 
           ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
-              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
-              "${FULL_SHA}" "${FULL_LATEST}" \
-              "${GHCR_USER}" "${GHCR_TOKEN}" \
+              "${TARBALL}" "${DEPLOY_DIR}" "${COMPOSE}" \
+              "${IMAGE_TAG}" "${IMAGE_SHA}" "${CONTAINER}" \
             << 'REMOTE_SCRIPT'
           set -euo pipefail
+          TARBALL="$1"; shift
           DEPLOY_DIR="$1"; shift
-          COMPOSE_FILE="$1"; shift
-          FULL_SHA="$1"; shift
-          FULL_LATEST="$1"; shift
-          GHCR_USER="$1"; shift
-          GHCR_TOKEN="$1"; shift
-
-          echo "→ Login to GHCR (one-shot)"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin >/dev/null
+          COMPOSE="$1"; shift
+          IMAGE_TAG="$1"; shift
+          IMAGE_SHA="$1"; shift
+          CONTAINER="$1"; shift
 
           echo "→ cd ${DEPLOY_DIR}"
           cd "${DEPLOY_DIR}"
 
-          echo "→ docker pull ${FULL_SHA}"
-          docker pull "${FULL_SHA}"
+          echo "→ docker load -i ${TARBALL}"
+          docker load -i "${TARBALL}"
 
-          echo "→ re-tag ${FULL_SHA} → ${FULL_LATEST}"
-          docker tag "${FULL_SHA}" "${FULL_LATEST}"
+          echo "→ re-tag to :${IMAGE_TAG}"
+          docker tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
+                     "nefeshapps-pos-frontend:${IMAGE_TAG}"  # already correct
+          docker tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
+                     "nefeshapps-pos-frontend:${IMAGE_SHA}"
 
-          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
-          docker compose -f "${COMPOSE_FILE}" up -d --build
+          echo "→ docker compose -f ${COMPOSE} up -d --build"
+          docker compose -f "${COMPOSE}" up -d --build
 
-          echo "→ prune dangling images"
+          echo "→ docker image prune -f (dangling only)"
           docker image prune -f
 
+          echo "→ cleanup local tarball"
+          rm -f "${TARBALL}"
+
           echo "→ container status"
-          docker ps --filter "name=nefeshapps-pos-frontend" \
+          docker ps --filter "name=${CONTAINER}" \
             --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
           echo "→ image actually running"
-          docker inspect --format '{{.Config.Image}}' nefeshapps-pos-frontend
+          docker inspect --format '{{.Config.Image}}' "${CONTAINER}"
           REMOTE_SCRIPT
 
           echo "✓ deploy complete"
@@ -159,7 +155,7 @@ jobs:
         run: |
           echo "## 🚀 Production deploy" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: nefeshapps-pos-frontend:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
           echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure

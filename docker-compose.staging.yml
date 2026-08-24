@@ -20,7 +20,7 @@
 #   when it reports "container running" — keep it.
 services:
   frontend:
-    image: ghcr.io/robbiereta/pos-frontend:staging
+    image: nefeshapps-pos-frontend:staging
     container_name: nefeshapps-pos-frontend-staging
     ports:
       - "127.0.0.1:3004:3002"
