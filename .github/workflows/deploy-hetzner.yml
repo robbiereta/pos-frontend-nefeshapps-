@@ -1,38 +1,34 @@
 name: Deploy to Hetzner
 
 # ============================================================
-# Deploys the Vite-built dist/ to the Hetzner Cloud server
-# (npos-frontend, formerly nefeshapps-pos-frontend).
+# SSH-less deploy to the Hetzner Cloud server.
 #
 # Pipeline:
-#   1. Build the production bundle (Vite, 1080×1920 PWA assets)
-#   2. Pre-flight via Hetzner Cloud API (server must be `running`)
-#   3. Take a pre-deploy image snapshot via the Hetzner API
-#      (for one-click rollback)
-#   4. SCP the dist/ to the server
-#   5. docker cp into the running nginx container + reload
-#   6. HTTP health-check the live URL
-#   7. Post-deploy snapshot for the audit trail
+#   1. Build the Vite bundle (VITE_API_URL baked in)
+#   2. Upload dist/ to Hetzner Object Storage (S3-compatible)
+#   3. Hetzner Cloud API → update server label "npos.deploy.sha"
+#      The deploy-agent on the server polls the Hetzner metadata
+#      API every 10s, sees the new label, pulls from S3, swaps
+#      the nginx container's html dir, and reloads nginx.
+#   4. HTTP health-check the public URL
+#   5. (Optional) Hetzner API → create_image snapshot
 #
-# Triggers:
-#   - workflow_dispatch (manual, with optional "force" + "skip-snapshot")
-#   - push to master (only on production merges)
+# No SSH key is ever stored in GitHub Secrets. The server-side
+# agent was installed once via SSH using server/deploy-agent/install.sh
+# and is configured to run as a systemd service.
 #
-# Required GitHub Secrets (Settings → Secrets and variables → Actions):
-#   HETZNER_API_TOKEN    — Hetzner Cloud API token (Project: read+write)
-#   HETZNER_SERVER_ID    — Numeric server ID (NOT the IP)
-#   HETZNER_SSH_KEY      — Private ed25519 key authorized on the server
-#                          (the Mavis sandbox key fingerprint
-#                          SHA256:6BMeC+aLNhMJ2Kaz9gV+spUWQJLxfi1Fa9FefdItl4E
-#                          can be used as a starting point; rotate before
-#                          committing to a long-lived secret)
-#   HETZNER_SSH_USER     — SSH user (default: root)
-#   HETZNER_HOST         — Server IP (e.g. 204.168.163.106)
-#   HETZNER_HEALTH_URL   — Public URL to health-check (e.g. https://nefeshapps.site/pos/)
+# Required GitHub Secrets:
+#   HETZNER_API_TOKEN    — Hetzner Cloud API token (Read & Write)
+#   HETZNER_SERVER_ID    — Numeric server ID
+#   HETZNER_S3_ENDPOINT  — Hetzner Object Storage endpoint
+#                          (e.g. https://fsn1.your-objectstorage.com)
+#   HETZNER_S3_BUCKET    — Bucket name (e.g. npos-dist)
+#   HETZNER_S3_ACCESS_KEY
+#   HETZNER_S3_SECRET_KEY
+#   HETZNER_S3_REGION    — (optional var) fsn1, nbg1, etc.
+#   HETZNER_HEALTH_URL   — Public URL to health-check
 #   VITE_API_URL         — Backend URL baked into the bundle
-#                          (e.g. https://cfdis.nefeshapps.site)
-#   CONTAINER_NAME       — (optional) Override the docker container name;
-#                          defaults to `npos-frontend`
+#   CONTAINER_NAME       — (optional var) defaults to npos-frontend
 # ============================================================
 
 on:
@@ -43,7 +39,7 @@ on:
         type: boolean
         default: false
       skip_snapshot:
-        description: "Skip pre/post-deploy snapshots (faster)"
+        description: "Skip post-deploy snapshot"
         type: boolean
         default: false
   push:
@@ -58,18 +54,19 @@ on:
 
 concurrency:
   group: deploy-hetzner
-  cancel-in-progress: false  # never cancel an in-flight deploy
+  cancel-in-progress: false
 
 env:
   CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'npos-frontend' }}
-  REMOTE_TMP: /tmp/npos-deploy-${{ github.sha }}
+  DEPLOY_LABEL:   "npos.deploy.sha"
+  S3_PREFIX:      "dist/"
 
 jobs:
   deploy:
-    name: Build & deploy
+    name: Build, upload, signal deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production  # requires manual approval if "production" env has reviewers
+    timeout-minutes: 10
+    environment: production
 
     steps:
       - name: Checkout
@@ -113,85 +110,90 @@ jobs:
             exit 1
           fi
 
-      # ─── Hetzner Cloud API: pre-deploy snapshot ───────────
-      - name: Hetzner API · pre-deploy snapshot
-        if: ${{ !inputs.skip_snapshot }}
+      # ─── Upload dist/ to Hetzner Object Storage ───────────
+      - name: Upload dist/ to Hetzner Object Storage
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.HETZNER_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION:    ${{ vars.HETZNER_S3_REGION || 'fsn1' }}
+          HETZNER_S3_ENDPOINT:   ${{ secrets.HETZNER_S3_ENDPOINT }}
+          HETZNER_S3_BUCKET:     ${{ secrets.HETZNER_S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          # aws-cli talks to any S3-compatible endpoint via --endpoint-url
+          # We upload the dist/ contents (not the directory itself) under
+          # the S3_PREFIX so the agent can pull dist/ cleanly.
+          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 sync dist/ "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}" \
+              --delete \
+              --cache-control "public, max-age=31536000, immutable" \
+              --exclude "index.html" \
+              --exclude "sw.js" \
+              --exclude "manifest.webmanifest"
+          # index.html, sw.js, manifest get no-cache so the agent re-serves
+          # them on every deploy.
+          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/index.html "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}index.html" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "text/html"
+          [ -f dist/sw.js ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/sw.js "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}sw.js" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "application/javascript" || true
+          [ -f dist/manifest.webmanifest ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/manifest.webmanifest "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}manifest.webmanifest" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "application/manifest+json" || true
+          echo "✓ uploaded"
+
+      # ─── Hetzner Cloud API: signal deploy via label ──────
+      - name: Hetzner API · update deploy label
         env:
           HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
           HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+          DEPLOY_LABEL:      ${{ env.DEPLOY_LABEL }}
+          NEW_SHA:           ${{ github.sha }}
         run: |
           set -euo pipefail
+          PAYLOAD=$(python3 -c "import json; print(json.dumps({'labels': {env_label: env_sha}}))" \
+            -e "import os; print()" 2>/dev/null || echo "")
+          # ^ python path is fragile; build payload directly:
+          PAYLOAD=$(cat <<EOF
+          {"labels":{"${DEPLOY_LABEL}":"${NEW_SHA}"}}
+          EOF
+          )
           RESP=$(curl -fsS -X POST \
             -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"description":"pre-deploy-${{ github.sha }}","type":"snapshot"}' \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image")
-          echo "${RESP}" | python3 -m json.tool
-          ACTION_ID=$(echo "${RESP}" | python3 -c "import sys,json; print(json.load(sys.stdin)['action']['id'])")
-          echo "Snapshot action: ${ACTION_ID}"
-          echo "HETZNER_PRE_SNAPSHOT_ACTION=${ACTION_ID}" >> "${GITHUB_ENV}"
+            -d "${PAYLOAD}" \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/change_labels")
+          echo "${RESP}" | python3 -m json.tool | head -10
+          echo "✓ deploy signaled (sha=${NEW_SHA})"
 
-      # ─── SCP the dist/ to the server ──────────────────────
-      - name: Upload dist/ to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_SSH_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "dist"
-          target: ${{ env.REMOTE_TMP }}
-          strip_components: 0
-          rm: false
-
-      # ─── SSH: replace container's html dir + reload nginx ──
-      - name: Swap dist into running container
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_SSH_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          command_timeout: 5m
-          script: |
-            set -euo pipefail
-            CONTAINER="${{ env.CONTAINER_NAME }}"
-            REMOTE_TMP="${{ env.REMOTE_TMP }}"
-
-            echo "→ Verifying container is running"
-            if ! docker inspect -f '{{.State.Running}}' "${CONTAINER}" 2>/dev/null | grep -q true; then
-              echo "::error::Container ${CONTAINER} is not running"
-              docker ps -a --filter "name=${CONTAINER}" || true
-              exit 1
-            fi
-
-            echo "→ Wiping old html dir in container"
-            docker exec "${CONTAINER}" sh -c 'rm -rf /usr/share/nginx/html/*'
-
-            echo "→ Copying new dist/ into container"
-            docker cp "${REMOTE_TMP}/dist/." "${CONTAINER}:/usr/share/nginx/html/"
-
-            echo "→ Reloading nginx (graceful, no downtime)"
-            docker exec "${CONTAINER}" nginx -s reload
-
-            echo "→ Cleanup local tmp"
-            rm -rf "${REMOTE_TMP}"
-
-            echo "→ Container status after deploy"
-            docker ps --filter "name=${CONTAINER}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-      # ─── Health check ──────────────────────────────────────
-      - name: Health check
+      # ─── Health check (no SSH — public HTTP) ─────────────
+      - name: Health check (wait for agent to pick up label)
         env:
           HEALTH_URL: ${{ secrets.HETZNER_HEALTH_URL }}
         run: |
           set -euo pipefail
-          echo "Waiting 5s for nginx to settle..."
-          sleep 5
-          HTTP_CODE=$(curl -fsS --retry 5 --retry-delay 3 --max-time 10 \
-            -o /dev/null -w "%{http_code}" \
-            "${HEALTH_URL}" || echo "000")
-          echo "HTTP ${HTTP_CODE} from ${HEALTH_URL}"
+          # The agent polls every 10s. Allow up to 90s for the
+          # label change to propagate, the S3 download to finish,
+          # and nginx to reload.
+          HTTP_CODE="000"
+          for i in $(seq 1 9); do
+            sleep 10
+            HTTP_CODE=$(curl -fsS --max-time 5 \
+              -o /dev/null -w "%{http_code}" \
+              "${HEALTH_URL}" 2>/dev/null || echo "000")
+            echo "attempt $i ($(date +%H:%M:%S)): HTTP ${HTTP_CODE}"
+            if [ "${HTTP_CODE}" = "200" ]; then
+              break
+            fi
+          done
           if [ "${HTTP_CODE}" != "200" ]; then
-            echo "::error::Health check failed (HTTP ${HTTP_CODE})"
+            echo "::error::Health check failed after 90s (HTTP ${HTTP_CODE})"
+            echo "Check the deploy-agent logs on the server:"
+            echo "  journalctl -u deploy-agent.service -n 100"
             exit 1
           fi
 
@@ -211,7 +213,7 @@ jobs:
             | python3 -m json.tool
 
   rollback:
-    name: Rollback to a previous image
+    name: Rollback · revert to previous image
     runs-on: ubuntu-latest
     needs: deploy
     if: failure()
@@ -220,7 +222,6 @@ jobs:
       - name: Hetzner API · list snapshots
         env:
           HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
         run: |
           curl -fsS \
             -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
@@ -232,10 +233,15 @@ jobs:
           for img in data['images'][:5]:
             print(f\"  id={img['id']}  desc={img.get('description','')}  created={img['created']}\")"
 
-      - name: "Manual intervention required"
+      - name: "Manual rollback instructions"
         run: |
-          echo "::error::Deploy failed. To rollback, run the Hetzner API rebuild-from-image action with the most recent pre-deploy snapshot."
-          echo "Most recent pre-deploy snapshot action: ${{ env.HETZNER_PRE_SNAPSHOT_ACTION }}"
-          echo "Find the resulting image ID in the Hetzner Cloud Console or via:"
-          echo "  curl -sS -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" \"https://api.hetzner.cloud/v1/images?type=snapshot\" | jq '.images[] | select(.description | startswith(\"pre-deploy-${{ github.sha }}\"))'"
+          echo "::error::Deploy failed. To rollback, set the npos.deploy.sha label to the previous SHA via:"
+          echo "  curl -X POST -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" -H \"Content-Type: application/json\" \\"
+          echo "    -d '{\"labels\":{\"npos.deploy.sha\":\"<previous-sha>\"}}' \\"
+          echo "    https://api.hetzner.cloud/v1/servers/\$HETZNER_SERVER_ID/actions/change_labels"
+          echo "  The agent will see the older SHA in the previous snapshot's S3 state and redeploy it."
+          echo "  Or rebuild the server from a snapshot image (destructive):"
+          echo "  curl -X POST -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" -H \"Content-Type: application/json\" \\"
+          echo "    -d '{\"image\":<id>,\"start_after_create\":true}' \\"
+          echo "    https://api.hetzner.cloud/v1/servers/\$HETZNER_SERVER_ID/actions/rebuild"
           exit 1
