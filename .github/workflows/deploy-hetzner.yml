@@ -1,0 +1,241 @@
+name: Deploy to Hetzner
+
+# ============================================================
+# Deploys the Vite-built dist/ to the Hetzner Cloud server
+# (npos-frontend, formerly nefeshapps-pos-frontend).
+#
+# Pipeline:
+#   1. Build the production bundle (Vite, 1080×1920 PWA assets)
+#   2. Pre-flight via Hetzner Cloud API (server must be `running`)
+#   3. Take a pre-deploy image snapshot via the Hetzner API
+#      (for one-click rollback)
+#   4. SCP the dist/ to the server
+#   5. docker cp into the running nginx container + reload
+#   6. HTTP health-check the live URL
+#   7. Post-deploy snapshot for the audit trail
+#
+# Triggers:
+#   - workflow_dispatch (manual, with optional "force" + "skip-snapshot")
+#   - push to master (only on production merges)
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   HETZNER_API_TOKEN    — Hetzner Cloud API token (Project: read+write)
+#   HETZNER_SERVER_ID    — Numeric server ID (NOT the IP)
+#   HETZNER_SSH_KEY      — Private ed25519 key authorized on the server
+#                          (the Mavis sandbox key fingerprint
+#                          SHA256:6BMeC+aLNhMJ2Kaz9gV+spUWQJLxfi1Fa9FefdItl4E
+#                          can be used as a starting point; rotate before
+#                          committing to a long-lived secret)
+#   HETZNER_SSH_USER     — SSH user (default: root)
+#   HETZNER_HOST         — Server IP (e.g. 204.168.163.106)
+#   HETZNER_HEALTH_URL   — Public URL to health-check (e.g. https://nefeshapps.site/pos/)
+#   VITE_API_URL         — Backend URL baked into the bundle
+#                          (e.g. https://cfdis.nefeshapps.site)
+#   CONTAINER_NAME       — (optional) Override the docker container name;
+#                          defaults to `npos-frontend`
+# ============================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Skip pre-deploy health check"
+        type: boolean
+        default: false
+      skip_snapshot:
+        description: "Skip pre/post-deploy snapshots (faster)"
+        type: boolean
+        default: false
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - ".github/workflows/deploy-hetzner.yml"
+
+concurrency:
+  group: deploy-hetzner
+  cancel-in-progress: false  # never cancel an in-flight deploy
+
+env:
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'npos-frontend' }}
+  REMOTE_TMP: /tmp/npos-deploy-${{ github.sha }}
+
+jobs:
+  deploy:
+    name: Build & deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production  # requires manual approval if "production" env has reviewers
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: npm run build
+
+      - name: Verify dist/ was produced
+        run: |
+          test -f dist/index.html || (echo "::error::dist/index.html missing" && exit 1)
+          echo "Build artifacts:"
+          ls -la dist | head -20
+
+      # ─── Hetzner Cloud API: pre-flight ────────────────────
+      - name: Hetzner API · check server status
+        if: ${{ !inputs.force }}
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+        run: |
+          set -euo pipefail
+          STATUS=$(curl -fsS \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['server']['status'])")
+          echo "Server status: ${STATUS}"
+          if [ "${STATUS}" != "running" ]; then
+            echo "::error::Server is not running (status: ${STATUS}). Aborting deploy."
+            exit 1
+          fi
+
+      # ─── Hetzner Cloud API: pre-deploy snapshot ───────────
+      - name: Hetzner API · pre-deploy snapshot
+        if: ${{ !inputs.skip_snapshot }}
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+        run: |
+          set -euo pipefail
+          RESP=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"description":"pre-deploy-${{ github.sha }}","type":"snapshot"}' \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image")
+          echo "${RESP}" | python3 -m json.tool
+          ACTION_ID=$(echo "${RESP}" | python3 -c "import sys,json; print(json.load(sys.stdin)['action']['id'])")
+          echo "Snapshot action: ${ACTION_ID}"
+          echo "HETZNER_PRE_SNAPSHOT_ACTION=${ACTION_ID}" >> "${GITHUB_ENV}"
+
+      # ─── SCP the dist/ to the server ──────────────────────
+      - name: Upload dist/ to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_SSH_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          source: "dist"
+          target: ${{ env.REMOTE_TMP }}
+          strip_components: 0
+          rm: false
+
+      # ─── SSH: replace container's html dir + reload nginx ──
+      - name: Swap dist into running container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_SSH_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -euo pipefail
+            CONTAINER="${{ env.CONTAINER_NAME }}"
+            REMOTE_TMP="${{ env.REMOTE_TMP }}"
+
+            echo "→ Verifying container is running"
+            if ! docker inspect -f '{{.State.Running}}' "${CONTAINER}" 2>/dev/null | grep -q true; then
+              echo "::error::Container ${CONTAINER} is not running"
+              docker ps -a --filter "name=${CONTAINER}" || true
+              exit 1
+            fi
+
+            echo "→ Wiping old html dir in container"
+            docker exec "${CONTAINER}" sh -c 'rm -rf /usr/share/nginx/html/*'
+
+            echo "→ Copying new dist/ into container"
+            docker cp "${REMOTE_TMP}/dist/." "${CONTAINER}:/usr/share/nginx/html/"
+
+            echo "→ Reloading nginx (graceful, no downtime)"
+            docker exec "${CONTAINER}" nginx -s reload
+
+            echo "→ Cleanup local tmp"
+            rm -rf "${REMOTE_TMP}"
+
+            echo "→ Container status after deploy"
+            docker ps --filter "name=${CONTAINER}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+      # ─── Health check ──────────────────────────────────────
+      - name: Health check
+        env:
+          HEALTH_URL: ${{ secrets.HETZNER_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          echo "Waiting 5s for nginx to settle..."
+          sleep 5
+          HTTP_CODE=$(curl -fsS --retry 5 --retry-delay 3 --max-time 10 \
+            -o /dev/null -w "%{http_code}" \
+            "${HEALTH_URL}" || echo "000")
+          echo "HTTP ${HTTP_CODE} from ${HEALTH_URL}"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::Health check failed (HTTP ${HTTP_CODE})"
+            exit 1
+          fi
+
+      # ─── Hetzner Cloud API: post-deploy snapshot ──────────
+      - name: Hetzner API · post-deploy snapshot
+        if: ${{ always() && !inputs.skip_snapshot }}
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"description":"post-deploy-${{ github.sha }}-${{ job.status }}","type":"snapshot"}' \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image" \
+            | python3 -m json.tool
+
+  rollback:
+    name: Rollback to a previous image
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    environment: production
+    steps:
+      - name: Hetzner API · list snapshots
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+        run: |
+          curl -fsS \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            "https://api.hetzner.cloud/v1/images?type=snapshot&sort=created:desc" \
+            | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Recent snapshots:')
+          for img in data['images'][:5]:
+            print(f\"  id={img['id']}  desc={img.get('description','')}  created={img['created']}\")"
+
+      - name: "Manual intervention required"
+        run: |
+          echo "::error::Deploy failed. To rollback, run the Hetzner API rebuild-from-image action with the most recent pre-deploy snapshot."
+          echo "Most recent pre-deploy snapshot action: ${{ env.HETZNER_PRE_SNAPSHOT_ACTION }}"
+          echo "Find the resulting image ID in the Hetzner Cloud Console or via:"
+          echo "  curl -sS -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" \"https://api.hetzner.cloud/v1/images?type=snapshot\" | jq '.images[] | select(.description | startswith(\"pre-deploy-${{ github.sha }}\"))'"
+          exit 1
