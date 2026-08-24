@@ -72,13 +72,16 @@ jobs:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
       - name: SCP image to Hetzner
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
-          username: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "/tmp/image.tar.gz"
-          target: "/tmp/image-${{ github.sha }}.tar.gz"
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+        run: |
+          set -euo pipefail
+          TARBALL="/tmp/image-${{ github.sha }}.tar.gz"
+          echo "scp /tmp/image.tar.gz ${HETZNER_USER}@${HETZNER_HOST}:${TARBALL}"
+          scp -o StrictHostKeyChecking=accept-new /tmp/image.tar.gz \
+            "${HETZNER_USER}@${HETZNER_HOST}:${TARBALL}"
+          echo "✓ transferred $(du -h /tmp/image.tar.gz | cut -f1)"
 
   deploy:
     name: SSH · load · compose up
