@@ -1,14 +1,26 @@
-name: Deploy to Production (Hetzner API)
+name: Deploy to Production
 
 # ============================================================
 # Auto-deploy to production on push to master.
-# Uses Hetzner Cloud API + Hetzner Object Storage (S3-compatible).
-# No SSH key in GitHub Secrets — see deploy-hetzner.README.md.
 #
-# Pairs with:
-#   - server/deploy-agent/  (the polling agent on the server)
-#   - .github/workflows/deploy-staging.yml  (staging counterpart)
-#   - .github/workflows/deploy-hetzner.yml   (manual dispatch + rollbacks)
+# Pipeline:
+#   1. Build the Docker image (Vite build inside the image)
+#   2. Push to GitHub Container Registry (ghcr.io)
+#      - tagged :latest AND :sha-<short-sha>
+#   3. SSH to the Hetzner box
+#   4. `docker login ghcr.io` (one-shot)
+#   5. `docker pull` the new sha-tagged image
+#   6. Re-tag to :latest so the compose file picks it up
+#   7. `docker compose up -d --build`
+#   8. Prune dangling images
+#
+# Required GitHub Secrets:
+#   HETZNER_SSH_KEY — ed25519 private key authorized on the server
+#   HETZNER_HOST    — server IP (default 204.168.163.106, override via secret/var)
+#   HETZNER_USER    — SSH user (default root, override via secret/var)
+#
+# GITHUB_TOKEN is auto-provided by GitHub Actions and has packages:write
+# permission for GHCR pushes (see permissions block below).
 # ============================================================
 
 on:
@@ -21,6 +33,7 @@ on:
       - "vite.config.js"
       - "index.html"
       - "Dockerfile"
+      - "docker-compose.yml"
       - ".github/workflows/deploy-prod.yml"
   workflow_dispatch:
 
@@ -28,133 +41,126 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  DEPLOY_LABEL: npos.deploy.sha
-  S3_PREFIX:    dist/
-  CONTAINER:    npos-frontend
+  IMAGE_NAME:   ghcr.io/robbiereta/pos-frontend
+  TAG_LATEST:   latest
+  TAG_SHA:      sha-${{ github.sha }}
+  DEPLOY_DIR:   /nefeshapps
+  COMPOSE_FILE: docker-compose.yml
 
 jobs:
-  deploy:
-    name: Build, upload, signal deploy
+  build-and-push:
+    name: Build image & push to GHCR
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          node-version: '20'
-          cache: 'npm'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
+            ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build production bundle
+  deploy:
+    name: SSH · pull · compose up
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build-and-push
+    environment: production
+
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Deploy on Hetzner
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: npm run build
-
-      - name: Verify dist/ was produced
-        run: |
-          test -f dist/index.html || (echo "::error::dist/index.html missing" && exit 1)
-
-      # ─── Hetzner Cloud API: pre-flight ────────────────────
-      - name: Hetzner API · check server status
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
-        run: |
-          set -euo pipefail
-          STATUS=$(curl -fsS \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['server']['status'])")
-          echo "Server status: ${STATUS}"
-          [ "${STATUS}" = "running" ] || (echo "::error::Server not running"; exit 1)
-
-      # ─── Upload dist/ to Hetzner Object Storage ───────────
-      - name: Upload dist/ to Hetzner Object Storage
-        env:
-          AWS_ACCESS_KEY_ID:     ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          AWS_DEFAULT_REGION:    ${{ vars.HETZNER_S3_REGION || 'fsn1' }}
-          HETZNER_S3_ENDPOINT:   ${{ secrets.HETZNER_S3_ENDPOINT }}
-          HETZNER_S3_BUCKET:     ${{ secrets.HETZNER_S3_BUCKET }}
-        run: |
-          set -euo pipefail
-          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 sync dist/ "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}" --delete \
-              --cache-control "public, max-age=31536000, immutable" \
-              --exclude "index.html" --exclude "sw.js" --exclude "manifest.webmanifest"
-          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/index.html "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}index.html" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "text/html"
-          [ -f dist/sw.js ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/sw.js "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}sw.js" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "application/javascript" || true
-          [ -f dist/manifest.webmanifest ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/manifest.webmanifest "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}manifest.webmanifest" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "application/manifest+json" || true
-
-      # ─── Hetzner Cloud API: signal deploy ────────────────
-      - name: Hetzner API · update deploy label
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+          HETZNER_HOST:    ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER:    ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+          IMAGE_NAME:      ${{ env.IMAGE_NAME }}
+          TAG_SHA:         ${{ env.TAG_SHA }}
+          TAG_LATEST:      ${{ env.TAG_LATEST }}
+          DEPLOY_DIR:      ${{ env.DEPLOY_DIR }}
+          COMPOSE_FILE:    ${{ env.COMPOSE_FILE }}
+          GHCR_USER:       ${{ github.actor }}
+          GHCR_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          curl -fsS -X POST \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"labels\":{\"${DEPLOY_LABEL}\":\"${{ github.sha }}\"}}" \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/change_labels" \
-            | python3 -m json.tool | head -8
-          echo "✓ deploy signaled (sha=${{ github.sha }})"
+          FULL_SHA="${IMAGE_NAME}:${TAG_SHA}"
+          FULL_LATEST="${IMAGE_NAME}:${TAG_LATEST}"
+          echo "Deploying ${FULL_SHA} → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR}"
 
-      # ─── Health check ──────────────────────────────────────
-      - name: Health check (wait for agent to pick up label)
-        env:
-          HEALTH_URL: ${{ secrets.HETZNER_HEALTH_URL }}
-        run: |
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
+              "${FULL_SHA}" "${FULL_LATEST}" \
+              "${GHCR_USER}" "${GHCR_TOKEN}" \
+            << 'REMOTE_SCRIPT'
           set -euo pipefail
-          HTTP_CODE="000"
-          for i in $(seq 1 9); do
-            sleep 10
-            HTTP_CODE=$(curl -fsS --max-time 5 -o /dev/null -w "%{http_code}" "${HEALTH_URL}" 2>/dev/null || echo "000")
-            echo "attempt $i: HTTP ${HTTP_CODE}"
-            [ "${HTTP_CODE}" = "200" ] && break
-          done
-          [ "${HTTP_CODE}" = "200" ] || (echo "::error::Health check failed (HTTP ${HTTP_CODE})"; exit 1)
+          DEPLOY_DIR="$1"; shift
+          COMPOSE_FILE="$1"; shift
+          FULL_SHA="$1"; shift
+          FULL_LATEST="$1"; shift
+          GHCR_USER="$1"; shift
+          GHCR_TOKEN="$1"; shift
 
-      # ─── Snapshot (post-deploy) ────────────────────────────
-      - name: Hetzner API · post-deploy snapshot
-        if: ${{ always() }}
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
-        run: |
-          set -euo pipefail
-          curl -fsS -X POST \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"description":"prod-${{ github.sha }}-${{ job.status }}","type":"snapshot"}' \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image" \
-            | python3 -m json.tool
+          echo "→ Login to GHCR (one-shot)"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin >/dev/null
+
+          echo "→ cd ${DEPLOY_DIR}"
+          cd "${DEPLOY_DIR}"
+
+          echo "→ docker pull ${FULL_SHA}"
+          docker pull "${FULL_SHA}"
+
+          echo "→ re-tag ${FULL_SHA} → ${FULL_LATEST}"
+          docker tag "${FULL_SHA}" "${FULL_LATEST}"
+
+          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
+          docker compose -f "${COMPOSE_FILE}" up -d --build
+
+          echo "→ prune dangling images"
+          docker image prune -f
+
+          echo "→ container status"
+          docker ps --filter "name=nefeshapps-pos-frontend" \
+            --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+          echo "→ image actually running"
+          docker inspect --format '{{.Config.Image}}' nefeshapps-pos-frontend
+          REMOTE_SCRIPT
+
+          echo "✓ deploy complete"
 
       - name: Notify success
         if: success()
         run: |
           echo "## 🚀 Production deploy" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}" >> $GITHUB_STEP_SUMMARY
           echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Health: ${{ secrets.HETZNER_HEALTH_URL }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure
         if: failure()
@@ -162,4 +168,4 @@ jobs:
           echo "::error::Production deploy failed for ${{ github.sha }}"
           echo "## 🚨 Production deploy FAILED" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Check: Hetzner server status, deploy-agent logs" >> $GITHUB_STEP_SUMMARY
+          echo "- Check: docker ps on the server, recent deploy logs" >> $GITHUB_STEP_SUMMARY

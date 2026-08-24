@@ -1,8 +1,6 @@
 services:
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/robbiereta/pos-frontend:latest
     container_name: nefeshapps-pos-frontend
     ports:
       - "127.0.0.1:3002:3002"
@@ -11,3 +9,6 @@ services:
       - NODE_ENV=production
     env_file:
       - .env.production
+    # `docker compose up -d --build` is a no-op for this service
+    # (no `build:` directive) — the new image is pulled from GHCR
+    # by the deploy workflow before the compose up.

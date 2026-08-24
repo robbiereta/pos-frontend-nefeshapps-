@@ -1,247 +1,163 @@
-name: Deploy to Hetzner
+name: Deploy to Hetzner (manual)
 
 # ============================================================
-# SSH-less deploy to the Hetzner Cloud server.
+# Manual deploy with tag/env selection. Same SSH+pull+compose
+# flow as deploy-prod.yml / deploy-staging.yml, but with
+# workflow_dispatch inputs so you can:
+#   - pick a tag from the existing images in GHCR
+#   - pick the env (prod / staging)
+#   - force a re-pull of an existing tag
 #
-# Pipeline:
-#   1. Build the Vite bundle (VITE_API_URL baked in)
-#   2. Upload dist/ to Hetzner Object Storage (S3-compatible)
-#   3. Hetzner Cloud API → update server label "npos.deploy.sha"
-#      The deploy-agent on the server polls the Hetzner metadata
-#      API every 10s, sees the new label, pulls from S3, swaps
-#      the nginx container's html dir, and reloads nginx.
-#   4. HTTP health-check the public URL
-#   5. (Optional) Hetzner API → create_image snapshot
-#
-# No SSH key is ever stored in GitHub Secrets. The server-side
-# agent was installed once via SSH using server/deploy-agent/install.sh
-# and is configured to run as a systemd service.
-#
-# Required GitHub Secrets:
-#   HETZNER_API_TOKEN    — Hetzner Cloud API token (Read & Write)
-#   HETZNER_SERVER_ID    — Numeric server ID
-#   HETZNER_S3_ENDPOINT  — Hetzner Object Storage endpoint
-#                          (e.g. https://fsn1.your-objectstorage.com)
-#   HETZNER_S3_BUCKET    — Bucket name (e.g. npos-dist)
-#   HETZNER_S3_ACCESS_KEY
-#   HETZNER_S3_SECRET_KEY
-#   HETZNER_S3_REGION    — (optional var) fsn1, nbg1, etc.
-#   HETZNER_HEALTH_URL   — Public URL to health-check
-#   VITE_API_URL         — Backend URL baked into the bundle
-#   CONTAINER_NAME       — (optional var) defaults to npos-frontend
+# Useful for:
+#   - redeploying a previous SHA without rebuilding
+#   - promoting a specific commit between envs
+#   - smoke-testing a fix
 # ============================================================
 
 on:
   workflow_dispatch:
     inputs:
-      force:
-        description: "Skip pre-deploy health check"
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+          - staging
+      tag:
+        description: "Image tag to deploy (sha-<commit> or branch name)"
+        type: string
+        required: true
+        default: "latest"
+      force_pull:
+        description: "Always pull even if image is cached locally"
         type: boolean
-        default: false
-      skip_snapshot:
-        description: "Skip post-deploy snapshot"
-        type: boolean
-        default: false
-  push:
-    branches: [master]
-    paths:
-      - "src/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vite.config.js"
-      - "index.html"
-      - ".github/workflows/deploy-hetzner.yml"
+        default: true
 
 concurrency:
-  group: deploy-hetzner
+  group: deploy-hetzner-manual
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  packages: read
+
 env:
-  CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'npos-frontend' }}
-  DEPLOY_LABEL:   "npos.deploy.sha"
-  S3_PREFIX:      "dist/"
+  IMAGE_NAME: ghcr.io/robbiereta/pos-frontend
 
 jobs:
   deploy:
-    name: Build, upload, signal deploy
+    name: SSH · pull · compose up
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
+    environment: ${{ inputs.environment }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          node-version: '20'
-          cache: 'npm'
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build production bundle
+      - name: Resolve env-specific paths
+        id: paths
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: npm run build
-
-      - name: Verify dist/ was produced
+          ENV: ${{ inputs.environment }}
         run: |
-          test -f dist/index.html || (echo "::error::dist/index.html missing" && exit 1)
-          echo "Build artifacts:"
-          ls -la dist | head -20
+          case "${ENV}" in
+            production)
+              echo "deploy_dir=/nefeshapps"       >> "$GITHUB_OUTPUT"
+              echo "compose_file=docker-compose.yml" >> "$GITHUB_OUTPUT"
+              echo "container=nefeshapps-pos-frontend" >> "$GITHUB_OUTPUT"
+              echo "image_tag=latest"             >> "$GITHUB_OUTPUT"
+              ;;
+            staging)
+              echo "deploy_dir=/nefeshapps/staging"   >> "$GITHUB_OUTPUT"
+              echo "compose_file=docker-compose.staging.yml" >> "$GITHUB_OUTPUT"
+              echo "container=nefeshapps-pos-frontend-staging" >> "$GITHUB_OUTPUT"
+              echo "image_tag=staging"              >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unknown environment: ${ENV}"
+              exit 1
+              ;;
+          esac
 
-      # ─── Hetzner Cloud API: pre-flight ────────────────────
-      - name: Hetzner API · check server status
-        if: ${{ !inputs.force }}
+      - name: Deploy on Hetzner
         env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
-        run: |
-          set -euo pipefail
-          STATUS=$(curl -fsS \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['server']['status'])")
-          echo "Server status: ${STATUS}"
-          if [ "${STATUS}" != "running" ]; then
-            echo "::error::Server is not running (status: ${STATUS}). Aborting deploy."
-            exit 1
-          fi
-
-      # ─── Upload dist/ to Hetzner Object Storage ───────────
-      - name: Upload dist/ to Hetzner Object Storage
-        env:
-          AWS_ACCESS_KEY_ID:     ${{ secrets.HETZNER_S3_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
-          AWS_DEFAULT_REGION:    ${{ vars.HETZNER_S3_REGION || 'fsn1' }}
-          HETZNER_S3_ENDPOINT:   ${{ secrets.HETZNER_S3_ENDPOINT }}
-          HETZNER_S3_BUCKET:     ${{ secrets.HETZNER_S3_BUCKET }}
+          HETZNER_HOST:  ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER:  ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+          IMAGE_NAME:    ${{ env.IMAGE_NAME }}
+          TAG:           ${{ inputs.tag }}
+          FORCE_PULL:    ${{ inputs.force_pull }}
+          GHCR_USER:     ${{ github.actor }}
+          GHCR_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_DIR:    ${{ steps.paths.outputs.deploy_dir }}
+          COMPOSE_FILE:  ${{ steps.paths.outputs.compose_file }}
+          CONTAINER:     ${{ steps.paths.outputs.container }}
         run: |
           set -euo pipefail
-          # aws-cli talks to any S3-compatible endpoint via --endpoint-url
-          # We upload the dist/ contents (not the directory itself) under
-          # the S3_PREFIX so the agent can pull dist/ cleanly.
-          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 sync dist/ "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}" \
-              --delete \
-              --cache-control "public, max-age=31536000, immutable" \
-              --exclude "index.html" \
-              --exclude "sw.js" \
-              --exclude "manifest.webmanifest"
-          # index.html, sw.js, manifest get no-cache so the agent re-serves
-          # them on every deploy.
-          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/index.html "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}index.html" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "text/html"
-          [ -f dist/sw.js ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/sw.js "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}sw.js" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "application/javascript" || true
-          [ -f dist/manifest.webmanifest ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
-              s3 cp dist/manifest.webmanifest "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}manifest.webmanifest" \
-              --cache-control "no-cache, no-store, must-revalidate" \
-              --content-type "application/manifest+json" || true
-          echo "✓ uploaded"
+          FULL_TAG="${IMAGE_NAME}:${TAG}"
+          echo "Deploying ${FULL_TAG} → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR}"
 
-      # ─── Hetzner Cloud API: signal deploy via label ──────
-      - name: Hetzner API · update deploy label
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
-          DEPLOY_LABEL:      ${{ env.DEPLOY_LABEL }}
-          NEW_SHA:           ${{ github.sha }}
-        run: |
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
+              "${FULL_TAG}" "${CONTAINER}" \
+              "${GHCR_USER}" "${GHCR_TOKEN}" \
+              "${FORCE_PULL}" \
+            << 'REMOTE_SCRIPT'
           set -euo pipefail
-          PAYLOAD=$(python3 -c "import json; print(json.dumps({'labels': {env_label: env_sha}}))" \
-            -e "import os; print()" 2>/dev/null || echo "")
-          # ^ python path is fragile; build payload directly:
-          PAYLOAD=$(cat <<EOF
-          {"labels":{"${DEPLOY_LABEL}":"${NEW_SHA}"}}
-          EOF
-          )
-          RESP=$(curl -fsS -X POST \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "${PAYLOAD}" \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/change_labels")
-          echo "${RESP}" | python3 -m json.tool | head -10
-          echo "✓ deploy signaled (sha=${NEW_SHA})"
+          DEPLOY_DIR="$1"; shift
+          COMPOSE_FILE="$1"; shift
+          FULL_TAG="$1"; shift
+          CONTAINER="$1"; shift
+          GHCR_USER="$1"; shift
+          GHCR_TOKEN="$1"; shift
+          FORCE_PULL="$1"; shift
 
-      # ─── Health check (no SSH — public HTTP) ─────────────
-      - name: Health check (wait for agent to pick up label)
-        env:
-          HEALTH_URL: ${{ secrets.HETZNER_HEALTH_URL }}
-        run: |
-          set -euo pipefail
-          # The agent polls every 10s. Allow up to 90s for the
-          # label change to propagate, the S3 download to finish,
-          # and nginx to reload.
-          HTTP_CODE="000"
-          for i in $(seq 1 9); do
-            sleep 10
-            HTTP_CODE=$(curl -fsS --max-time 5 \
-              -o /dev/null -w "%{http_code}" \
-              "${HEALTH_URL}" 2>/dev/null || echo "000")
-            echo "attempt $i ($(date +%H:%M:%S)): HTTP ${HTTP_CODE}"
-            if [ "${HTTP_CODE}" = "200" ]; then
-              break
+          echo "→ Login to GHCR (one-shot)"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin >/dev/null
+
+          cd "${DEPLOY_DIR}"
+
+          if [ "${FORCE_PULL}" = "true" ]; then
+            echo "→ docker pull ${FULL_TAG} (force)"
+            docker pull "${FULL_TAG}"
+          else
+            # Check if image exists locally first
+            if docker image inspect "${FULL_TAG}" >/dev/null 2>&1; then
+              echo "→ image present locally, skipping pull"
+            else
+              echo "→ docker pull ${FULL_TAG}"
+              docker pull "${FULL_TAG}"
             fi
-          done
-          if [ "${HTTP_CODE}" != "200" ]; then
-            echo "::error::Health check failed after 90s (HTTP ${HTTP_CODE})"
-            echo "Check the deploy-agent logs on the server:"
-            echo "  journalctl -u deploy-agent.service -n 100"
-            exit 1
           fi
 
-      # ─── Hetzner Cloud API: post-deploy snapshot ──────────
-      - name: Hetzner API · post-deploy snapshot
-        if: ${{ always() && !inputs.skip_snapshot }}
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
-        run: |
-          set -euo pipefail
-          curl -fsS -X POST \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{"description":"post-deploy-${{ github.sha }}-${{ job.status }}","type":"snapshot"}' \
-            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image" \
-            | python3 -m json.tool
+          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
+          docker compose -f "${COMPOSE_FILE}" up -d --build
 
-  rollback:
-    name: Rollback · revert to previous image
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: failure()
-    environment: production
-    steps:
-      - name: Hetzner API · list snapshots
-        env:
-          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
-        run: |
-          curl -fsS \
-            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
-            "https://api.hetzner.cloud/v1/images?type=snapshot&sort=created:desc" \
-            | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          print('Recent snapshots:')
-          for img in data['images'][:5]:
-            print(f\"  id={img['id']}  desc={img.get('description','')}  created={img['created']}\")"
+          echo "→ container status"
+          docker ps --filter "name=${CONTAINER}" \
+            --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-      - name: "Manual rollback instructions"
+          echo "→ image actually running"
+          docker inspect --format '{{.Config.Image}}' "${CONTAINER}"
+          REMOTE_SCRIPT
+
+          echo "✓ manual deploy complete"
+
+      - name: Notify success
+        if: success()
         run: |
-          echo "::error::Deploy failed. To rollback, set the npos.deploy.sha label to the previous SHA via:"
-          echo "  curl -X POST -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" -H \"Content-Type: application/json\" \\"
-          echo "    -d '{\"labels\":{\"npos.deploy.sha\":\"<previous-sha>\"}}' \\"
-          echo "    https://api.hetzner.cloud/v1/servers/\$HETZNER_SERVER_ID/actions/change_labels"
-          echo "  The agent will see the older SHA in the previous snapshot's S3 state and redeploy it."
-          echo "  Or rebuild the server from a snapshot image (destructive):"
-          echo "  curl -X POST -H \"Authorization: Bearer \$HETZNER_API_TOKEN\" -H \"Content-Type: application/json\" \\"
-          echo "    -d '{\"image\":<id>,\"start_after_create\":true}' \\"
-          echo "    https://api.hetzner.cloud/v1/servers/\$HETZNER_SERVER_ID/actions/rebuild"
-          exit 1
+          echo "## 🚀 Manual deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "::error::Manual deploy failed"
+          echo "## 🚨 Manual deploy FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
