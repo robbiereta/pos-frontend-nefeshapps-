@@ -65,25 +65,20 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
-      - name: SCP image to Hetzner
+      - name: SCP image + compose to Hetzner
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
           HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
         run: |
           set -euo pipefail
           TARBALL="/tmp/image-staging-${{ github.sha }}.tar.gz"
+          echo "→ scp image"
           scp -o StrictHostKeyChecking=accept-new /tmp/image.tar.gz \
             "${HETZNER_USER}@${HETZNER_HOST}:${TARBALL}"
+          echo "→ scp compose (keeps server in sync with the repo)"
+          scp -o StrictHostKeyChecking=accept-new docker-compose.staging.yml \
+            "${HETZNER_USER}@${HETZNER_HOST}:/nefeshapps/staging/docker-compose.staging.yml" || true
           echo "✓ transferred"
-
-      - name: Bootstrap staging deploy dir on server
-        env:
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
-          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
-        run: |
-          set -euo pipefail
-          ssh -o StrictHostKeyChecking=accept-new "${HETZNER_USER}@${HETZNER_HOST}" \
-            "mkdir -p /nefeshapps/staging"
 
   deploy:
     name: SSH · load · compose up
@@ -131,25 +126,10 @@ jobs:
           echo "→ cd ${DEPLOY_DIR}"
           cd "${DEPLOY_DIR}"
 
-          echo "→ ensure ${COMPOSE} is in place (create if missing)"
+          echo "→ ensure ${COMPOSE} is in place (SCP'd by the runner)"
           if [ ! -f "${COMPOSE}" ]; then
-            echo "  creating ${COMPOSE} from inline template"
-            cat > "${COMPOSE}" << 'COMPOSE_TEMPLATE'
-# staging docker-compose (auto-created by deploy workflow)
-services:
-  frontend:
-    image: nefeshapps-pos-frontend:staging
-    container_name: nefeshapps-pos-frontend-staging
-    ports:
-      - "127.0.0.1:3004:3002"
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=staging
-    labels:
-      - env=staging
-      - service=pos-frontend
-COMPOSE_TEMPLATE
-            echo "  ✓ ${COMPOSE} created"
+            echo "::error::${COMPOSE} missing in ${DEPLOY_DIR} on the server (SCP must have failed)"
+            exit 1
           fi
 
           echo "→ docker load -i ${TARBALL}"
