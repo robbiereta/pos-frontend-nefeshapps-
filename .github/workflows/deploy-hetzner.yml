@@ -133,7 +133,8 @@ jobs:
           TARBALL="/tmp/image-manual-${{ github.sha }}.tar.gz"
           echo "Manual deploy → ${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR} (env=${ENV}, primary_tag=${PRIMARY_TAG})"
 
-          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+          ssh -o StrictHostKeyChecking=accept-new \
+              "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
               "${TARBALL}" "${DEPLOY_DIR}" "${COMPOSE}" \
               "${PRIMARY_TAG}" "${CONTAINER}" \
               "${CUSTOM_TAG}" \

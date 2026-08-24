@@ -103,7 +103,8 @@ jobs:
           TARBALL="/tmp/image-staging-${{ github.sha }}.tar.gz"
           echo "Loading $TARBALL on $HETZNER_USER@$HETZNER_HOST"
 
-          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+          ssh -o StrictHostKeyChecking=accept-new \
+              "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
               "${TARBALL}" "${DEPLOY_DIR}" "${COMPOSE}" \
               "${IMAGE_TAG}" "${IMAGE_SHA}" "${CONTAINER}" \
             << 'REMOTE_SCRIPT'
