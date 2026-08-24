@@ -27,8 +27,6 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=staging
-    env_file:
-      - .env.staging
     labels:
       - env=staging
       - service=pos-frontend
