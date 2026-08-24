@@ -1,86 +1,168 @@
-name: Deploy to Staging
+name: Deploy to Staging (Hetzner API)
+
+# ============================================================
+# Auto-deploy to staging on push to Staging.
+# Uses Hetzner Cloud API + Hetzner Object Storage (S3-compatible).
+# No SSH key in GitHub Secrets — see deploy-hetzner.README.md.
+#
+# Differences from deploy-prod.yml:
+#   - VITE_API_URL points to the staging backend
+#   - S3_PREFIX is "staging/dist/" (kept separate from prod)
+#   - DEPLOY_LABEL is "npos.deploy.sha.staging" (independent
+#     from the prod label, so prod + staging can roll independently)
+#   - Health URL is the staging URL
+#   - Container name is "npos-frontend-staging" (set as var)
+# ============================================================
 
 on:
   push:
     branches: [Staging]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - "Dockerfile"
+      - ".github/workflows/deploy-staging.yml"
   workflow_dispatch:
 
 concurrency:
   group: deploy-staging
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  DEPLOY_LABEL: npos.deploy.sha.staging
+  S3_PREFIX:    staging/dist/
+  CONTAINER:    ${{ vars.STAGING_CONTAINER || 'npos-frontend-staging' }}
 
 jobs:
   deploy:
-    name: Build & deploy to Hetzner (Staging)
+    name: Build, upload, signal deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: staging
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend (staging)
-        run: npm run build
+      - name: Build staging bundle
         env:
-          VITE_API_URL: https://cfdi-staging.nefeshapps.site
+          VITE_API_URL: ${{ vars.STAGING_VITE_API_URL || secrets.STAGING_VITE_API_URL || secrets.VITE_API_URL }}
+        run: npm run build
 
-      - name: Set up SSH key
+      - name: Verify dist/ was produced
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HETZNER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          test -f dist/index.html || (echo "::error::dist/index.html missing" && exit 1)
 
-      - name: Build and save Docker image
+      # ─── Hetzner Cloud API: pre-flight ────────────────────
+      - name: Hetzner API · check server status
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
         run: |
-          docker build -f Dockerfile -t nefeshapps-pos-frontend:staging .
-          docker save nefeshapps-pos-frontend:staging | gzip > /tmp/frontend-staging.tar.gz
+          set -euo pipefail
+          STATUS=$(curl -fsS \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['server']['status'])")
+          echo "Server status: ${STATUS}"
+          [ "${STATUS}" = "running" ] || (echo "::error::Server not running"; exit 1)
 
-      - name: Transfer image to Hetzner
+      # ─── Upload dist/ to Hetzner Object Storage ───────────
+      - name: Upload dist/ to Hetzner Object Storage
+        env:
+          AWS_ACCESS_KEY_ID:     ${{ secrets.HETZNER_S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.HETZNER_S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION:    ${{ vars.HETZNER_S3_REGION || 'fsn1' }}
+          HETZNER_S3_ENDPOINT:   ${{ secrets.HETZNER_S3_ENDPOINT }}
+          HETZNER_S3_BUCKET:     ${{ secrets.HETZNER_S3_BUCKET }}
         run: |
-          scp /tmp/frontend-staging.tar.gz root@${{ secrets.HETZNER_IP }}:/tmp/
-          echo "✅ Image transferred to Hetzner"
+          set -euo pipefail
+          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 sync dist/ "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}" --delete \
+              --cache-control "public, max-age=31536000, immutable" \
+              --exclude "index.html" --exclude "sw.js" --exclude "manifest.webmanifest"
+          aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/index.html "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}index.html" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "text/html"
+          [ -f dist/sw.js ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/sw.js "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}sw.js" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "application/javascript" || true
+          [ -f dist/manifest.webmanifest ] && aws --endpoint-url "${HETZNER_S3_ENDPOINT}" \
+              s3 cp dist/manifest.webmanifest "s3://${HETZNER_S3_BUCKET}/${S3_PREFIX}manifest.webmanifest" \
+              --cache-control "no-cache, no-store, must-revalidate" \
+              --content-type "application/manifest+json" || true
 
-      - name: Deploy on Hetzner
+      # ─── Hetzner Cloud API: signal deploy ────────────────
+      - name: Hetzner API · update deploy label
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
         run: |
-          ssh root@${{ secrets.HETZNER_IP }} << 'EOF'
-          set -e
-          mkdir -p /nefeshapps/staging
-          cd /nefeshapps/staging
-          echo "🐳 Stopping existing staging container..."
-          docker compose -f docker-compose.staging.yml down 2>/dev/null || true
+          set -euo pipefail
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"labels\":{\"${DEPLOY_LABEL}\":\"${{ github.sha }}\"}}" \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/change_labels" \
+            | python3 -m json.tool | head -8
+          echo "✓ staging deploy signaled (sha=${{ github.sha }})"
 
-          echo "📥 Loading Docker image..."
-          docker load -i /tmp/frontend-staging.tar.gz
+      # ─── Health check ──────────────────────────────────────
+      - name: Health check (wait for agent to pick up label)
+        env:
+          HEALTH_URL: ${{ vars.STAGING_HEALTH_URL || secrets.STAGING_HEALTH_URL || secrets.HETZNER_HEALTH_URL }}
+        run: |
+          set -euo pipefail
+          HTTP_CODE="000"
+          for i in $(seq 1 9); do
+            sleep 10
+            HTTP_CODE=$(curl -fsS --max-time 5 -o /dev/null -w "%{http_code}" "${HEALTH_URL}" 2>/dev/null || echo "000")
+            echo "attempt $i: HTTP ${HTTP_CODE}"
+            [ "${HTTP_CODE}" = "200" ] && break
+          done
+          [ "${HTTP_CODE}" = "200" ] || (echo "::error::Health check failed (HTTP ${HTTP_CODE})"; exit 1)
 
-          echo "🚀 Starting staging frontend container..."
-          docker compose -f docker-compose.staging.yml up -d || true
+      # ─── Snapshot (post-deploy) — only on success ──────────
+      - name: Hetzner API · post-deploy snapshot
+        if: ${{ success() }}
+        env:
+          HETZNER_API_TOKEN: ${{ secrets.HETZNER_API_TOKEN }}
+          HETZNER_SERVER_ID: ${{ secrets.HETZNER_SERVER_ID }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${HETZNER_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"description":"staging-${{ github.sha }}","type":"snapshot"}' \
+            "https://api.hetzner.cloud/v1/servers/${HETZNER_SERVER_ID}/actions/create_image" \
+            | python3 -m json.tool
 
-          echo "✅ Container running:"
-          docker ps --filter "label=env=staging" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-          echo "🧹 Cleanup..."
-          rm -f /tmp/frontend-staging.tar.gz
-          EOF
-
-      - name: Notify deployment
+      - name: Notify success
         if: success()
         run: |
-          echo "✅ Frontend deployed to STAGING"
-          echo "## 🚀 Staging deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- Service: pos-frontend (staging)" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Staging deploy" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Health: ${{ secrets.HETZNER_HEALTH_URL }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure
         if: failure()
         run: |
-          echo "❌ Staging deployment failed"
-          echo "## 🚨 Staging deployment failed" >> $GITHUB_STEP_SUMMARY
+          echo "::error::Staging deploy failed for ${{ github.sha }}"
+          echo "## 🚨 Staging deploy FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Check: Hetzner server status, deploy-agent logs" >> $GITHUB_STEP_SUMMARY

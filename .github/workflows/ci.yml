@@ -37,7 +37,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_URL: https://cfdi.nefeshapps.site
+          # CI builds use the production API URL. Branch-specific
+          # builds (PR / Staging preview) override via vars.
+          VITE_API_URL: ${{ vars.CI_VITE_API_URL || secrets.VITE_API_URL || 'https://cfdi.nefeshapps.site' }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
