@@ -30,7 +30,7 @@ jobs:
       - name: Build frontend (staging)
         run: npm run build
         env:
-          VITE_API_URL: https://cfdi-staging.nefeshapps.site
+          VITE_API_URL: https://cfdis.nefeshapps.site
 
       - name: Set up SSH key
         run: |
