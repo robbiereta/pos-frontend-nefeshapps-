@@ -57,7 +57,7 @@ function Navbar() {
   return (
     <>
       <nav className="navbar">
-        <h1 className="navbar-brand">Nefesh</h1>
+        <h1 className="navbar-brand">npos</h1>
         <button className={`hamburger ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(!isOpen)} aria-label="Menú">
           <span></span>
           <span></span>

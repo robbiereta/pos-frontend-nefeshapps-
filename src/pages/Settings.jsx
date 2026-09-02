@@ -581,7 +581,7 @@ export default function Settings() {
                     </li>
                     <li>
                       Inicia sesión con las <strong>mismas credenciales</strong> que usaste
-                      al registrarte en Nefesh (el email de tu cuenta y la contraseña SW).
+                      al registrarte en npos (el email de tu cuenta y la contraseña SW).
                     </li>
                     <li>
                       En el menú lateral, entra a <em>“Certificados / CSD”</em> (o

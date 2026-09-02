@@ -103,8 +103,8 @@ export default function NavbarModern() {
   return (
     <header className="navbar-modern" role="banner" ref={navRef}>
       <Link to="/dashboard" className="navbar-modern__brand" onClick={() => { setOpen(false); setOpenSection(null); }}>
-        <span className="navbar-modern__brand-mark" aria-hidden>N</span>
-        <span>Nefesh</span>
+        <span className="navbar-modern__brand-mark" aria-hidden>n</span>
+        <span>npos</span>
       </Link>
 
       <nav className={`navbar-modern__primary ${open ? 'open' : ''}`} aria-label="Principal">
