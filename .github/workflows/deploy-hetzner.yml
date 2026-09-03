@@ -47,6 +47,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Add Hetzner host key to known_hosts
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H "${HETZNER_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+          echo "added host key for ${HETZNER_HOST}"
+
       - name: Resolve target paths
         id: paths
         env:
