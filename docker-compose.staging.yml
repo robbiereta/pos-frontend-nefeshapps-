@@ -1,0 +1,32 @@
+# Staging compose for the pos-frontend.
+# Used by .github/workflows/deploy-staging.yml when a push lands on
+# the Staging branch. The deploy workflow:
+#   1. Builds the image in CI as `ghcr.io/robbiereta/pos-frontend:staging`
+#      (also tagged with the git SHA)
+#   2. SSH to the Hetzner box
+#   3. `docker pull` the new image from GHCR
+#   4. `docker compose -f docker-compose.staging.yml up -d --build`
+#      (the `--build` is a no-op here — no `build:` directive — but
+#      kept for parity with prod)
+#
+# Notes:
+# - Host port 3004 (prod uses 3002) so the two environments can run
+#   side by side on the same Hetzner box.
+# - Container name has the `-staging` suffix so it doesn't collide
+#   with the prod container if both ever run on the same host.
+# - `env_file: .env.staging` is read from the deploy directory on the
+#   server (/nefeshapps/staging/.env.staging). NOT committed to git.
+# - The `env=staging` label is what the deploy workflow greps for
+#   when it reports "container running" — keep it.
+services:
+  frontend:
+    image: nefeshapps-pos-frontend:staging
+    container_name: nefeshapps-pos-frontend-staging
+    ports:
+      - "127.0.0.1:3004:3002"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=staging
+    labels:
+      - env=staging
+      - service=pos-frontend

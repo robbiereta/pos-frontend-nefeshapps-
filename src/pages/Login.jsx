@@ -29,8 +29,8 @@ export default function Login() {
     <div className="login-shell">
       <aside className="login-aside" aria-hidden>
         <div className="login-aside__brand">
-          <span className="login-aside__mark">N</span>
-          <span>Nefesh</span>
+          <span className="login-aside__mark">n</span>
+          <span>npos</span>
         </div>
         <div className="login-aside__copy">
           <h2>Facturación electrónica, sin fricción.</h2>

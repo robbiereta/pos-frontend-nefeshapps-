@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../services/api';
 import { useToast } from '../components/ui/Toast.jsx';
+import Button from '../components/ui/Button';
 import './Settings.css';
 
 export default function Settings() {
@@ -182,7 +183,7 @@ export default function Settings() {
 
   return (
     <div className="settings-container">
-      <div className="settings-header">
+      <div className="page-title-hero">
         <h1>Configuración</h1>
         <p>Administra tu perfil y configuración de facturación</p>
       </div>
@@ -205,7 +206,19 @@ export default function Settings() {
             >
               Configuración de Emisor
             </button>
-            
+            <button
+              className={`tab-btn ${activeTab === 'sw' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sw')}
+            >
+              Portal SW.com.mx
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'csd' ? 'active' : ''}`}
+              onClick={() => setActiveTab('csd')}
+            >
+              Certificados (CSD)
+            </button>
+
           </div>
 
           {/* TAB: PROFILE */}
@@ -482,13 +495,14 @@ export default function Settings() {
                     <small>Mensaje que aparecerá al pie del recibo ({emisorForm.receiptMessage?.length || 0}/200 caracteres)</small>
                   </div>
 
-                  <button
+                  <Button
                     type="submit"
-                    className="btn btn-primary"
+                    variant="primary"
                     disabled={loading}
+                    loading={loading}
                   >
                     {loading ? 'Guardando...' : 'Guardar Configuración'}
-                  </button>
+                  </Button>
                 </form>
               </div>
             </div>
@@ -541,6 +555,71 @@ export default function Settings() {
 
                 <div className="info-alert">
                   <strong>⚠️ Nota:</strong> Los tokens no se almacenan localmente. Debes obtenerlos del portal de SW.com.mx y usarlos en tus aplicaciones cliente.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CSD — Certificados de Sello Digital */}
+          {activeTab === 'csd' && (
+            <div className="tab-content">
+              <div className="card">
+                <h2>Certificados de Sello Digital (CSD)</h2>
+                <p className="section-description">
+                  Para timbrar facturas (CFDI 4.0) el SAT exige que cada emisor suba su
+                  Certificado de Sello Digital (archivos <code>.cer</code> + <code>.key</code> + contraseña)
+                  al PAC. Aquí no se suben — se suben en el portal de SW.com.mx.
+                </p>
+
+                <div className="sw-info-box" style={{ marginTop: '1.25rem' }}>
+                  <h3>Cómo agregar tus CSD</h3>
+                  <ol>
+                    <li>
+                      Abre <a href="https://portal.sw.com.mx" target="_blank" rel="noopener noreferrer">
+                        <strong>portal.sw.com.mx</strong>
+                      </a> en una pestaña nueva.
+                    </li>
+                    <li>
+                      Inicia sesión con las <strong>mismas credenciales</strong> que usaste
+                      al registrarte en npos (el email de tu cuenta y la contraseña SW).
+                    </li>
+                    <li>
+                      En el menú lateral, entra a <em>“Certificados / CSD”</em> (o
+                      “Emisión → Sellos digitales” según la versión del portal).
+                    </li>
+                    <li>
+                      Sube los tres archivos que el SAT te entregó:
+                      <ul style={{ marginTop: '0.4rem' }}>
+                        <li><code>certificado.cer</code> — el certificado público</li>
+                        <li><code>llave.key</code> — la llave privada</li>
+                        <li>La contraseña de la llave (la que el SAT te pidió al tramitarla)</li>
+                      </ul>
+                    </li>
+                    <li>
+                      Confirma con tu <strong>contraseña del portal SW</strong> para activar el sello.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="info-alert" style={{ marginTop: '1rem' }}>
+                  <strong>ℹ️ Importante:</strong> los CSD NO se suben en este panel. Se suben
+                  directamente en el portal de SW porque el PAC los necesita firmados con su propio
+                  sistema. Una vez subidos, los CFDI que timbres desde aquí saldrán automáticamente
+                  con tu sello sin que tengas que hacer nada más.
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem' }}>
+                  <Button
+                    variant="primary"
+                    onClick={() => window.open('https://portal.sw.com.mx', '_blank', 'noopener,noreferrer')}
+                  >
+                    Abrir portal.sw.com.mx
+                  </Button>
+                  {swInfo?.email && (
+                    <span className="muted" style={{ alignSelf: 'center' }}>
+                      Entra con: <code>{swInfo.email}</code>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

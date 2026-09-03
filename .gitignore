@@ -34,3 +34,9 @@ coverage/
 
 # Vite
 .vite/
+
+# Playwright
+e2e/screenshots/
+test-results/
+playwright-report/
+.worktrees/

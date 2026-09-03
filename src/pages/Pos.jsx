@@ -3,6 +3,8 @@ import { salesService, userService, clientService } from '../services/api';
 import { productService } from '../services/productService';
 import { notesService } from '../services/notesService';
 import BarcodeSearch from '../components/BarcodeSearch';
+import QuickAddProductModal from '../components/QuickAddProductModal';
+import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
 
 const Pos = () => {
@@ -28,6 +30,7 @@ const Pos = () => {
   const [paymentForm, setPaymentForm] = useState('01');
   const [loading, setLoading] = useState(false);
   const [emisor, setEmisor] = useState(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const toast = useToast();
 
   // Fetch products, clients, and emisor config on mount
@@ -41,7 +44,11 @@ const Pos = () => {
     try {
       setLoadingClients(true);
       const response = await clientService.getAllClients({ limit: 100 });
-      setClients(response.data?.clients || response.data || []);
+      // Backend returns { success, data: <clients[]>, pagination }. The
+      // defensive Array.isArray() here is for edge cases only (e.g. an
+      // unauthenticated 401 with a JSON body that doesn't match this
+      // shape). The contract is: response.data IS the array.
+      setClients(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       setClients([]);
     } finally {
@@ -123,7 +130,11 @@ const Pos = () => {
       setLoadingProducts(true);
       setProductsError(null);
       const response = await productService.getProducts({ limit: 100, activo: 'true' });
-      const productsList = response.data?.products || response.data || [];
+      // Same contract: response.data.products is the array.
+      // Defensive guard only kicks in for unexpected response shapes.
+      const productsList = Array.isArray(response.data?.products)
+        ? response.data.products
+        : [];
 
       // Map API products to POS format
       const posProducts = productsList.map(p => ({
@@ -260,6 +271,66 @@ const Pos = () => {
       };
       setCart([...cart, newItem]);
     }
+  };
+
+  // Quick-add product from the QuickAddProductModal.
+  // Same IVA/merge logic as addToCart, but takes an explicit quantity.
+  const handleQuickAddToCart = (product, qty = 1) => {
+    const quantity = Math.max(1, parseInt(qty, 10) || 1);
+    const unitPrice = product.valorUnitario || 0;
+    const name = product.nombre || product.descripcion || 'Producto';
+
+    const existing = cart.find((item) => item.id === product.id);
+    if (existing) {
+      const newCantidad = existing.cantidad + quantity;
+      const newImporte = newCantidad * existing.valorUnitario;
+      const baseAmount = newImporte / 1.16;
+      const ivaAmount = newImporte - baseAmount;
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                cantidad: newCantidad,
+                importe: newImporte,
+                impuestos: {
+                  traslados: [{
+                    base: baseAmount,
+                    impuesto: '002',
+                    tipoFactor: 'Tasa',
+                    tasaOCuota: '0.160000',
+                    importe: ivaAmount,
+                  }],
+                },
+              }
+            : item,
+        ),
+      );
+      toast.success(`+${quantity} ${name}`);
+    } else {
+      const baseAmount = unitPrice / 1.16;
+      const ivaAmount = unitPrice - baseAmount;
+      setCart([
+        ...cart,
+        {
+          ...product,
+          cantidad: quantity,
+          importe: unitPrice * quantity,
+          descuento: 0,
+          impuestos: {
+            traslados: [{
+              base: baseAmount * quantity,
+              impuesto: '002',
+              tipoFactor: 'Tasa',
+              tasaOCuota: '0.160000',
+              importe: ivaAmount * quantity,
+            }],
+          },
+        },
+      ]);
+      toast.success(`Agregado: ${name} ×${quantity}`);
+    }
+    setShowQuickAdd(false);
   };
 
   // Update item quantity
@@ -620,27 +691,27 @@ const Pos = () => {
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Punto de Venta (POS)</h1>
-      
+    <div className="pos-page">
+      <div className="page-title-hero">
+        <div>
+          <h1>Punto de Venta</h1>
+          <p>Agrega productos al carrito, asigna un cliente y procesa la venta.</p>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            onClick={fetchProducts}
+          >
+            Actualizar catálogo
+          </Button>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px' }}>
         {/* Products Section */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h2>Catálogo de Productos</h2>
-            <button
-              onClick={fetchProducts}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#2c5aa0',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Actualizar
-            </button>
           </div>
 
           <div style={{ marginBottom: '12px' }}>
@@ -703,7 +774,31 @@ const Pos = () => {
             padding: '20px',
             textAlign: 'center'
           }}>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>🛒 Carrito</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '600' }}>🛒 Carrito</h2>
+              <button
+                type="button"
+                onClick={() => setShowQuickAdd(true)}
+                title="Buscar o crear producto"
+                aria-label="Buscar o crear producto"
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: '1.5px solid rgba(255,255,255,0.5)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.35)')}
+                onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+              >
+                ➕ Agregar
+              </button>
+            </div>
           </div>
 
           {cart.length === 0 ? (
@@ -885,19 +980,23 @@ const Pos = () => {
                 ))}
               </div>
 
-              {/* Totals */}
+              {/* Totals — ported to .stats-grid / .stat-card for the pwa visual identity */}
               <div style={{ padding: '15px', backgroundColor: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                  <span style={{ color: '#666' }}>Subtotal:</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>${calculateSubtotal().toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '13px', borderBottom: '1px solid #e9ecef', paddingBottom: '12px' }}>
-                  <span style={{ color: '#666' }}>IVA (16%):</span>
-                  <span style={{ fontWeight: '600', color: '#333' }}>${calculateTax().toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '700' }}>
-                  <span>Total:</span>
-                  <span style={{ color: '#667eea' }}>${calculateTotal().toFixed(2)}</span>
+                <div className="stats-grid" style={{ marginBottom: 0 }}>
+                  <div className="stat-card">
+                    <div className="stat-card__value">${calculateSubtotal().toFixed(2)}</div>
+                    <div className="stat-card__label">Subtotal</div>
+                  </div>
+                  <div className="stat-card info">
+                    <div className="stat-card__value">${calculateTax().toFixed(2)}</div>
+                    <div className="stat-card__label">IVA 16%</div>
+                  </div>
+                  <div className="stat-card success" style={{ gridColumn: 'span 2' }}>
+                    <div className="stat-card__value" style={{ color: 'var(--brand-500)' }}>
+                      ${calculateTotal().toFixed(2)}
+                    </div>
+                    <div className="stat-card__label">Total</div>
+                  </div>
                 </div>
               </div>
 
@@ -1101,6 +1200,12 @@ const Pos = () => {
         </div>
       </div>
 
+      {showQuickAdd && (
+        <QuickAddProductModal
+          onClose={() => setShowQuickAdd(false)}
+          onAddToCart={handleQuickAddToCart}
+        />
+      )}
     </div>
   );
 };

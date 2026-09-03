@@ -90,7 +90,8 @@ export default function CotizacionModal({ cotizacion, onClose, onSaved }) {
       setSearching(true);
       try {
         const r = await productService.getProducts({ searchQuery: productSearch, limit: 8 });
-        const list = r?.data?.products || r?.products || [];
+        const listRaw = r?.data?.products;
+        const list = Array.isArray(listRaw) ? listRaw : [];
         setSearchResults(list);
       } catch (e) { /* ignore */ }
       setSearching(false);

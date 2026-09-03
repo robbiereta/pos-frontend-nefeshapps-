@@ -1,69 +1,166 @@
 name: Deploy to Production
 
+# ============================================================
+# Auto-deploy to production on push to master.
+#
+# Pipeline (save + SCP, no registry auth needed):
+#   1. Build the Docker image (Vite build inside the image)
+#   2. Save to tarball (gzip)
+#   3. SSH to Hetzner
+#   4. scp the tarball
+#   5. On the server: docker load + tag + compose up -d
+#
+# Why save/SCP instead of GHCR pull?
+#   - The GHCR image is private. The server doesn't have a
+#     packages:read token. Save/SCP sidesteps the auth issue
+#     entirely — the image is just a binary tarball over SSH.
+#   - The image never leaves our control (GitHub Actions → SSH
+#     to our box, no third-party registry in the path).
+#
+# Trade-off vs GHCR pull: image travels 2x (CI runner → server
+# over SSH, instead of GHCR → server). For our ~50 MB image, this
+# adds ~10-15s to deploy. Worth it for the simpler auth model.
+# ============================================================
+
 on:
   push:
     branches: [master]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/deploy-prod.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME:    nefeshapps-pos-frontend
+  IMAGE_TAG:     sha-${{ github.sha }}
+  DEPLOY_DIR:    /nefeshapps
+  COMPOSE_FILE:  docker-compose.yml
+  CONTAINER:     nefeshapps-pos-frontend
 
 jobs:
-  deploy:
+  build-and-ship:
+    name: Build image + SCP to Hetzner
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          node-version: '24'
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build frontend
-        run: npm run build
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
-      - name: Set up SSH key
+      - name: Save image to tarball
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HETZNER_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          set -euo pipefail
+          mkdir -p /tmp/npos-deploy
+          docker save "${IMAGE_NAME}:${IMAGE_TAG}" \
+            | gzip > "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
+          ls -lh "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
 
-      - name: Build and push Docker image
+      - name: Ensure remote deploy dir exists
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
         run: |
-          docker build -f Dockerfile -t nefeshapps-pos-frontend:latest .
-          docker save nefeshapps-pos-frontend:latest | gzip > /tmp/frontend-image.tar.gz
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" "mkdir -p ${DEPLOY_DIR}"
 
-      - name: Transfer image to Hetzner
+      - name: SCP tarball to server
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
         run: |
-          scp /tmp/frontend-image.tar.gz root@${{ secrets.HETZNER_IP }}:/tmp/
-          scp docker-compose.yml root@${{ secrets.HETZNER_IP }}:/nefeshapps/
+          scp "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz" \
+              "${HETZNER_USER}@${HETZNER_HOST}:/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
 
-      - name: Deploy on Hetzner
+      - name: Load + tag + compose up on Hetzner
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
         run: |
-          ssh root@${{ secrets.HETZNER_IP }} << 'EOF'
-          set -e
-          cd /nefeshapps
-          echo "🐳 Stopping existing container..."
-          docker compose down 2>/dev/null || true
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
+              "${IMAGE_NAME}:${IMAGE_TAG}" "${CONTAINER}" \
+              "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz" \
+            << 'REMOTE_SCRIPT'
+          set -euo pipefail
+          DEPLOY_DIR="$1"; shift
+          COMPOSE_FILE="$1"; shift
+          FULL_TAG="$1"; shift
+          CONTAINER="$1"; shift
+          TARBALL="$1"; shift
 
-          echo "📥 Loading Docker image..."
-          docker load -i /tmp/frontend-image.tar.gz
+          echo "→ cd ${DEPLOY_DIR}"
+          cd "${DEPLOY_DIR}"
 
-          echo "🚀 Starting frontend container..."
-          docker compose up -d
+          echo "→ docker load < tarball"
+          docker load -i "${TARBALL}"
 
-          echo "✅ Container running:"
-          docker compose ps
+          echo "→ tag the loaded image (so compose picks it up by name)"
+          LOADED=$(docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep "$(echo "${FULL_TAG}" | cut -d: -f1)" \
+            | head -1)
+          if [ -n "${LOADED}" ] && [ "${LOADED}" != "${FULL_TAG}" ]; then
+            docker tag "${LOADED}" "${FULL_TAG}"
+          fi
 
-          echo "🧹 Cleanup..."
-          rm -f /tmp/frontend-image.tar.gz
-          EOF
+          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
+          docker compose -f "${COMPOSE_FILE}" up -d --build
 
+          echo "→ prune dangling images"
+          docker image prune -f
 
-      - name: Notify deployment
+          echo "→ container status"
+          docker ps --filter "name=${CONTAINER}" \
+            --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+          echo "→ image actually running"
+          docker inspect --format '{{.Config.Image}}' "${CONTAINER}"
+
+          echo "→ cleanup tarball"
+          rm -f "${TARBALL}"
+          REMOTE_SCRIPT
+
+      - name: Notify success
         if: success()
-        run: echo "✅ Frontend deployed to production: https://pos.nefeshapps.site"
+        run: |
+          echo "## 🚀 Production deploy" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure
         if: failure()
-        run: echo "❌ Deployment failed"
+        run: |
+          echo "::error::Production deploy failed for ${{ github.sha }}"
+          echo "## 🚨 Production deploy FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Check: docker ps on the server, recent deploy logs" >> $GITHUB_STEP_SUMMARY

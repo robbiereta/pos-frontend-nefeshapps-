@@ -17,6 +17,10 @@ import ListSales from './pages/listSales';
 import ApiTest from './pages/ApiTest';
 import Products from './pages/Products';
 import Cotizaciones from './pages/Cotizaciones';
+import Team from './pages/Team';
+import Categories from './pages/Categories';
+import TicketDesigner from './pages/TicketDesigner';
+import RoleGuard from './components/RoleGuard';
 import NotesReceivable from './pages/NotesReceivable';
 import NotesPayable from './pages/NotesPayable';
 import NavbarModern from './components/NavbarModern';
@@ -53,7 +57,7 @@ function Navbar() {
   return (
     <>
       <nav className="navbar">
-        <h1 className="navbar-brand">Nefesh</h1>
+        <h1 className="navbar-brand">npos</h1>
         <button className={`hamburger ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(!isOpen)} aria-label="Menú">
           <span></span>
           <span></span>
@@ -228,20 +232,22 @@ function App() {
           path="/api-test"
           element={
             <ProtectedRoute>
-              <NavbarModern />
-              <main className="main-content">
-                <ApiTest />
-              </main>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <ApiTest />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/products"
+          path="/ticket-designer"
           element={
             <ProtectedRoute>
               <NavbarModern />
               <main className="main-content">
-                <Products />
+                <TicketDesigner />
               </main>
             </ProtectedRoute>
           }
@@ -261,9 +267,22 @@ function App() {
           path="/settings"
           element={
             <ProtectedRoute>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <Settings />
+                </main>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <ProtectedRoute>
               <NavbarModern />
               <main className="main-content">
-                <Settings />
+                <Products />
               </main>
             </ProtectedRoute>
           }
@@ -287,6 +306,32 @@ function App() {
               <main className="main-content">
                 <NotesPayable />
               </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <RoleGuard>
+                <NavbarModern />
+                <main className="main-content">
+                  <Team />
+                </main>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allow={['owner', 'admin']}>
+                <NavbarModern />
+                <main className="main-content">
+                  <Categories />
+                </main>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />

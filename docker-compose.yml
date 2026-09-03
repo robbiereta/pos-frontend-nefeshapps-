@@ -1,8 +1,6 @@
 services:
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: nefeshapps-pos-frontend:latest
     container_name: nefeshapps-pos-frontend
     ports:
       - "127.0.0.1:3002:3002"
@@ -11,3 +9,12 @@ services:
       - NODE_ENV=production
     env_file:
       - .env.production
+    # The image is delivered to the server by the deploy workflow
+    # (CI builds → save → scp → docker load on the server). No
+    # `docker pull` needed, so the package visibility in GHCR
+    # doesn't matter.
+    #
+    # `docker compose up -d --build` is a no-op for this service
+    # (no `build:` directive) — the deploy workflow re-tags the
+    # loaded image as `nefeshapps-pos-frontend:latest` before
+    # the compose up, so this is the image that gets started.

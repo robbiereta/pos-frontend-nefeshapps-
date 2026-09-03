@@ -1,0 +1,27 @@
+[Unit]
+Description=Deploy Watcher (Hetzner API + git pull)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# El env file tiene HCLOUD_TOKEN y los paths
+EnvironmentFile=/etc/hetzner/deploy.env
+ExecStart=/opt/deploy-watcher/watcher.sh
+# Por si el deploy tarda (build, pull, restart)
+TimeoutStartSec=10min
+# Persistir aunque fallen pasos intermedios
+RemainAfterExit=no
+# No fallar el timer si el script retorna 0 (no hay deploy pendiente)
+SuccessExitStatus=0
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/app /var/lib/deploy
+
+[Install]
+WantedBy=multi-user.target

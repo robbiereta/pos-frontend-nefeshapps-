@@ -4,10 +4,13 @@ import ProductModal from '../components/ProductModal';
 import QuantityModal from '../components/QuantityModal';
 import BarcodeSearch from '../components/BarcodeSearch';
 import ImportProductsModal from '../components/ImportProductsModal';
+import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast.jsx';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import './Products.css';
 
 export default function Products() {
+  const { isAdmin } = useCurrentUser();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -95,8 +98,13 @@ export default function Products() {
   const fetchStats = async () => {
     try {
       const response = await productService.getInventoryStats();
-      const statsData = response.data?.stats || response.data || {};
-      setStats(statsData);
+      // Contract: response.data.stats is the stats object. Defensive
+      // object guard for edge cases.
+      setStats(
+        response.data?.stats && typeof response.data.stats === 'object'
+          ? response.data.stats
+          : {},
+      );
     } catch (err) {
       // Silent error
     }
@@ -105,7 +113,10 @@ export default function Products() {
   const fetchLowStock = async () => {
     try {
       const response = await productService.getLowStockProducts();
-      const lowStockData = response.data?.products || response.data || [];
+      // Contract: response.data.products is the low-stock array.
+      setLowStockProducts(
+        Array.isArray(response.data?.products) ? response.data.products : [],
+      );
       setLowStockProducts(lowStockData);
     } catch (err) {
       // Silent error
@@ -224,20 +235,28 @@ export default function Products() {
 
   return (
     <div className="products-page">
-      <div className="page-header">
-        <h1>Gestión de Productos</h1>
-        <div className="page-header-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowImportModal(true)}
-            title="Importar productos desde Excel o CSV"
-          >
-            📥 Importar
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            + Nuevo Producto
-          </button>
+      <div className="page-title-hero">
+        <div>
+          <h1>Gestión de Productos</h1>
+          <p>Administra tu catálogo, importa desde Excel y controla el inventario.</p>
         </div>
+        {isAdmin && (
+          <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportModal(true)}
+              title="Importar productos desde Excel o CSV"
+            >
+              Importar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Nuevo Producto
+            </Button>
+          </div>
+        )}
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -439,29 +458,31 @@ export default function Products() {
                       </span>
                     </td>
                     <td>
-                      <div className="action-buttons">
-                        <button
-                          className="btn-icon"
-                          onClick={() => openEditModal(product)}
-                          title="Editar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-icon"
-                          onClick={() => openQuantityModal(product)}
-                          title="Ajustar Stock"
-                        >
-                          📦
-                        </button>
-                        <button
-                          className="btn-icon btn-danger"
-                          onClick={() => handleDelete(product._id)}
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="action-buttons">
+                          <button
+                            className="btn-icon"
+                            onClick={() => openEditModal(product)}
+                            title="Editar"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => openQuantityModal(product)}
+                            title="Ajustar Stock"
+                          >
+                            📦
+                          </button>
+                          <button
+                            className="btn-icon btn-danger"
+                            onClick={() => handleDelete(product._id)}
+                            title="Eliminar"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

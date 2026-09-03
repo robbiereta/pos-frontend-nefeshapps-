@@ -4,17 +4,31 @@
    ===================================================================== */
 
 :root {
-  /* ---------- Color · Brand ---------- */
+  /* ---------- Color · Brand ----------
+     Brand scale inspired by the pwa-builder-output admin (#667eea → #764ba2).
+     We keep the indigo family for buttons/links and use the secondary violet
+     for the gradient identity mark + hero accents. */
   --brand-50:  #eef2ff;
   --brand-100: #e0e7ff;
   --brand-200: #c7d2fe;
   --brand-300: #a5b4fc;
   --brand-400: #818cf8;
-  --brand-500: #6366f1;
-  --brand-600: #4f46e5;
-  --brand-700: #4338ca;
-  --brand-800: #3730a3;
-  --brand-900: #312e81;
+  --brand-500: #667eea;   /* pwa primary */
+  --brand-600: #5a67d8;
+  --brand-700: #4c51bf;
+  --brand-800: #434190;
+  --brand-900: #3c366b;
+
+  /* Secondary brand (violet) — used for the gradient identity mark,
+     the page-title hero accent, and the login left aside background. */
+  --secondary-400: #9579d4;
+  --secondary-500: #764ba2;  /* pwa secondary */
+  --secondary-600: #5e3c87;
+  --secondary-700: #4a3068;
+
+  /* Brand gradient — the signature visual element ported from the pwa admin. */
+  --brand-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --brand-gradient-soft: linear-gradient(135deg, rgba(102, 126, 234, 0.12) 0%, rgba(118, 75, 162, 0.12) 100%);
 
   /* ---------- Color · Semantic ---------- */
   --success-50:  #ecfdf5;
@@ -131,9 +145,13 @@
   --z-modal: 1000;
   --z-toast: 1100;
 
-  /* ---------- Backward-compat aliases (so old CSS still resolves) ---------- */
-  --primary:        var(--brand-600);
-  --primary-light:  var(--brand-500);
+  /* ---------- Backward-compat aliases (so old CSS still resolves) ----------
+     NOTE: --primary/--primary-light are kept in sync with the brand scale above
+     so any legacy CSS that targets them still resolves. The visual identity mark
+     (gradient) lives in --brand-gradient — use that for hero/mark elements. */
+  --primary:        var(--brand-500);
+  --primary-light:  var(--brand-400);
+  --secondary:      var(--secondary-500);
   --success:        var(--success-600);
   --danger:         var(--danger-600);
   --warning:        var(--warning-600);
