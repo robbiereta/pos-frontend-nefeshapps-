@@ -2,13 +2,11 @@ name: Deploy to Staging
 
 # ============================================================
 # Auto-deploy to staging on push to Staging.
-# Same pattern as deploy-prod.yml: build → save → scp → docker
-# load on the server. No GHCR pull (works with private packages).
-#
-# The staging image gets the :staging tag (compose file
-# references it), and the staging container runs on host port
-# 3004 (prod uses 3002). Both can run side by side on the same
-# Hetzner box.
+# Same save+SCP pattern as deploy-prod.yml but:
+#   - pushes to /nefeshapps/staging (separate from prod)
+#   - uses docker-compose.staging.yml
+#   - container name: nefeshapps-pos-frontend-staging
+#   - host port: 3004 (prod uses 3002)
 # ============================================================
 
 on:
@@ -30,125 +28,107 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_TAG:  staging
-  DEPLOY_DIR: /nefeshapps/staging
-  COMPOSE:    docker-compose.staging.yml
-  CONTAINER:  nefeshapps-pos-frontend-staging
+  IMAGE_NAME:    nefeshapps-pos-frontend
+  IMAGE_TAG:     sha-${{ github.sha }}
+  DEPLOY_DIR:    /nefeshapps/staging
+  COMPOSE_FILE:  docker-compose.staging.yml
+  CONTAINER:     nefeshapps-pos-frontend-staging
 
 jobs:
-  build:
-    name: Build image & SCP to server
+  build-and-ship:
+    name: Build image + SCP to Hetzner
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build image
-        run: |
-          docker buildx build --load \
-            --tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
-            --tag "nefeshapps-pos-frontend:sha-${{ github.sha }}" \
-            .
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
       - name: Save image to tarball
         run: |
-          docker save "nefeshapps-pos-frontend:${IMAGE_TAG}" | gzip > /tmp/image.tar.gz
-          ls -la /tmp/image.tar.gz
+          set -euo pipefail
+          mkdir -p /tmp/npos-deploy
+          docker save "${IMAGE_NAME}:${IMAGE_TAG}" \
+            | gzip > "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
+          ls -lh "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
-
-      - name: SCP image + compose to Hetzner
+      - name: Ensure remote deploy dir exists
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
           HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
         run: |
-          set -euo pipefail
-          TARBALL="/tmp/image-staging-${{ github.sha }}.tar.gz"
-          echo "→ scp image"
-          scp -o StrictHostKeyChecking=accept-new /tmp/image.tar.gz \
-            "${HETZNER_USER}@${HETZNER_HOST}:${TARBALL}"
-          echo "→ scp compose (keeps server in sync with the repo)"
-          scp -o StrictHostKeyChecking=accept-new docker-compose.staging.yml \
-            "${HETZNER_USER}@${HETZNER_HOST}:/nefeshapps/staging/docker-compose.staging.yml" || true
-          echo "✓ transferred"
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" "mkdir -p ${DEPLOY_DIR}"
 
-  deploy:
-    name: SSH · load · compose up
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: build
-    environment: staging
-
-    steps:
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
-
-      - name: Deploy on Hetzner
+      - name: SCP tarball to server
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
           HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
-          IMAGE_TAG:   ${{ env.IMAGE_TAG }}
-          DEPLOY_DIR:  ${{ env.DEPLOY_DIR }}
-          COMPOSE:     ${{ env.COMPOSE }}
-          CONTAINER:   ${{ env.CONTAINER }}
-          IMAGE_SHA:   sha-${{ github.sha }}
         run: |
-          set -euo pipefail
-          TARBALL="/tmp/image-staging-${{ github.sha }}.tar.gz"
-          echo "Loading $TARBALL on $HETZNER_USER@$HETZNER_HOST"
+          scp "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz" \
+              "${HETZNER_USER}@${HETZNER_HOST}:/tmp/npos-deploy/${IMAGE_TAG}.tar.gz"
 
-          ssh -o StrictHostKeyChecking=accept-new \
-              "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
-              "${TARBALL}" "${DEPLOY_DIR}" "${COMPOSE}" \
-              "${IMAGE_TAG}" "${IMAGE_SHA}" "${CONTAINER}" \
+      - name: Load + tag + compose up on Hetzner
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+        run: |
+          ssh "${HETZNER_USER}@${HETZNER_HOST}" bash -s -- \
+              "${DEPLOY_DIR}" "${COMPOSE_FILE}" \
+              "${IMAGE_NAME}:${IMAGE_TAG}" "${CONTAINER}" \
+              "/tmp/npos-deploy/${IMAGE_TAG}.tar.gz" \
             << 'REMOTE_SCRIPT'
           set -euo pipefail
-          TARBALL="$1"; shift
           DEPLOY_DIR="$1"; shift
-          COMPOSE="$1"; shift
-          IMAGE_TAG="$1"; shift
-          IMAGE_SHA="$1"; shift
+          COMPOSE_FILE="$1"; shift
+          FULL_TAG="$1"; shift
           CONTAINER="$1"; shift
+          TARBALL="$1"; shift
 
-          echo "→ mkdir -p ${DEPLOY_DIR} (idempotent)"
           mkdir -p "${DEPLOY_DIR}"
-
-          echo "→ cd ${DEPLOY_DIR}"
           cd "${DEPLOY_DIR}"
 
-          echo "→ ensure ${COMPOSE} is in place (SCP'd by the runner)"
-          if [ ! -f "${COMPOSE}" ]; then
-            echo "::error::${COMPOSE} missing in ${DEPLOY_DIR} on the server (SCP must have failed)"
+          if [ ! -f "${COMPOSE_FILE}" ]; then
+            echo "::error::${COMPOSE_FILE} missing in ${DEPLOY_DIR} on the server"
             exit 1
           fi
 
-          echo "→ docker load -i ${TARBALL}"
+          echo "→ docker load < tarball"
           docker load -i "${TARBALL}"
 
-          echo "→ re-tag to :${IMAGE_TAG}"
-          docker tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
-                     "nefeshapps-pos-frontend:${IMAGE_TAG}"
-          docker tag "nefeshapps-pos-frontend:${IMAGE_TAG}" \
-                     "nefeshapps-pos-frontend:${IMAGE_SHA}"
+          echo "→ tag the loaded image (so compose picks it up by name)"
+          LOADED=$(docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep "$(echo "${FULL_TAG}" | cut -d: -f1)" \
+            | head -1)
+          if [ -n "${LOADED}" ] && [ "${LOADED}" != "${FULL_TAG}" ]; then
+            docker tag "${LOADED}" "${FULL_TAG}"
+          fi
 
-          echo "→ docker compose -f ${COMPOSE} up -d --build"
-          docker compose -f "${COMPOSE}" up -d --build
+          echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
+          docker compose -f "${COMPOSE_FILE}" up -d --build
 
-          echo "→ docker image prune -f"
+          echo "→ prune dangling images"
           docker image prune -f
-
-          echo "→ cleanup local tarball"
-          rm -f "${TARBALL}"
 
           echo "→ container status"
           docker ps --filter "label=env=staging" \
@@ -156,16 +136,17 @@ jobs:
 
           echo "→ image actually running"
           docker inspect --format '{{.Config.Image}}' "${CONTAINER}"
-          REMOTE_SCRIPT
 
-          echo "✓ staging deploy complete"
+          echo "→ cleanup tarball"
+          rm -f "${TARBALL}"
+          REMOTE_SCRIPT
 
       - name: Notify success
         if: success()
         run: |
           echo "## 🚀 Staging deploy" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: nefeshapps-pos-frontend:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
           echo "- Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Notify failure
@@ -175,4 +156,3 @@ jobs:
           echo "## 🚨 Staging deploy FAILED" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- Check: docker ps on the server, recent deploy logs" >> $GITHUB_STEP_SUMMARY
-# Mon Aug 24 19:45:57 UTC 2026
