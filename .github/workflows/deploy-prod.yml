@@ -142,6 +142,9 @@ jobs:
             docker tag "${LOADED}" "${FULL_TAG}"
           fi
 
+          echo "→ re-tag the :latest tag (prod compose will use this)"
+          docker tag "${FULL_TAG}" "nefeshapps-pos-frontend:latest"
+
           echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
           docker compose -f "${COMPOSE_FILE}" up -d --build
 
