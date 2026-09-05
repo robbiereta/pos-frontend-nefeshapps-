@@ -153,6 +153,18 @@ jobs:
           echo "→ re-tag the :latest tag (prod compose will use this)"
           docker tag "${FULL_TAG}" "nefeshapps-pos-frontend:latest"
 
+          echo "→ remove any pre-existing container with the target name"
+          if docker ps -a --format '{{.Names}}' | grep -qx "${CONTAINER}"; then
+            docker rm -f "${CONTAINER}" || true
+          fi
+
+          echo "→ also nuke any old build-prefixed container that may squat the name"
+          for old in pos-frontend-nefeshapps--frontend; do
+            if docker ps -a --format '{{.Names}}' | grep -qx "${old}"; then
+              docker rm -f "${old}" || true
+            fi
+          done
+
           echo "→ docker compose -f ${COMPOSE_FILE} up -d --build"
           docker compose -f "${COMPOSE_FILE}" up -d --build
 
