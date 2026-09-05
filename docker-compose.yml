@@ -7,8 +7,6 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-    env_file:
-      - .env.production
     # The image is delivered to the server by the deploy workflow
     # (CI builds → save → scp → docker load on the server). No
     # `docker pull` needed, so the package visibility in GHCR
@@ -18,3 +16,11 @@ services:
     # (no `build:` directive) — the deploy workflow re-tags the
     # loaded image as `nefeshapps-pos-frontend:latest` before
     # the compose up, so this is the image that gets started.
+    #
+    # NOTE: no `env_file:` — the previous .env.production file is
+    # not committed and not on the server. VITE_API_URL and other
+    # build-time variables are baked into the image at build time
+    # (see .github/workflows/ci.yml and the Dockerfile's builder
+    # stage). If you need a runtime env file later, drop one in
+    # /nefeshapps/ on the server and re-add `env_file: .env.production`
+    # here.
