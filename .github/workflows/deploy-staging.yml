@@ -90,6 +90,14 @@ jobs:
         run: |
           ssh "${HETZNER_USER}@${HETZNER_HOST}" "mkdir -p ${DEPLOY_DIR} /tmp/npos-deploy"
 
+      - name: Ship docker-compose.staging.yml to server
+        env:
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
+          HETZNER_USER: ${{ secrets.HETZNER_USER || vars.HETZNER_USER || 'root' }}
+        run: |
+          scp "docker-compose.staging.yml" \
+              "${HETZNER_USER}@${HETZNER_HOST}:${DEPLOY_DIR}/docker-compose.staging.yml"
+
       - name: SCP tarball to server
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST || vars.HETZNER_HOST || '204.168.163.106' }}
