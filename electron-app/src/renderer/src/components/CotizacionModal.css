@@ -34,7 +34,9 @@
   font-size: 12px;
   color: #475569;
 }
-.cotizacion-modal .form-grid label.full { grid-column: 1 / -1; }
+.cotizacion-modal .form-grid label.full {
+  grid-column: 1 / -1;
+}
 .cotizacion-modal .form-grid input,
 .cotizacion-modal .form-grid textarea,
 .cotizacion-modal .form-grid select {
@@ -72,7 +74,8 @@
 .cotizacion-modal .search-results {
   position: absolute;
   top: 100%;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   z-index: 10;
   list-style: none;
   margin: 4px 0 0;
@@ -80,7 +83,7 @@
   background: #fff;
   border: 1px solid #d0d4da;
   border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
   max-height: 240px;
   overflow: auto;
 }
@@ -93,7 +96,9 @@
   cursor: pointer;
   font-size: 14px;
 }
-.cotizacion-modal .search-results li:hover { background: #f1f5f9; }
+.cotizacion-modal .search-results li:hover {
+  background: #f1f5f9;
+}
 .cotizacion-modal .search-results .price {
   margin-left: auto;
   color: #1c8a4a;
@@ -140,15 +145,21 @@
   white-space: nowrap;
   padding: 0 8px;
 }
-.cotizacion-modal .items-table .strong { font-weight: 700; color: #1e293b; }
+.cotizacion-modal .items-table .strong {
+  font-weight: 700;
+  color: #1e293b;
+}
 .cotizacion-modal .btn-icon-danger {
   background: #fee2e2;
   border: 0;
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   cursor: pointer;
 }
-.cotizacion-modal .btn-icon-danger:hover { background: #fecaca; }
+.cotizacion-modal .btn-icon-danger:hover {
+  background: #fecaca;
+}
 
 .cotizacion-modal .totals-box {
   background: #1e293b;
@@ -171,4 +182,6 @@
   margin-top: 4px;
   font-size: 16px;
 }
-.cotizacion-modal .totals-box .total-final strong { color: #4ade80; }
+.cotizacion-modal .totals-box .total-final strong {
+  color: #4ade80;
+}

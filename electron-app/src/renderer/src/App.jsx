@@ -1,41 +1,41 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { authService } from './services/api';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
-import GlobalInvoice from './pages/GlobalInvoice';
-import InvoiceList from './pages/InvoiceList';
-import ClientInvoice from './pages/ClientInvoice';
-import ClientInvoiceWorkflow from './pages/ClientInvoiceWorkflow';
-import SaleToInvoice from './pages/SaleToInvoice';
-import CashDrawer from './pages/CashDrawer';
-import ClientsPage from './pages/ClientsPage';
-import Pos from './pages/Pos';
-import ListSales from './pages/listSales';
-import ApiTest from './pages/ApiTest';
-import Products from './pages/Products';
-import Cotizaciones from './pages/Cotizaciones';
-import Team from './pages/Team';
-import Categories from './pages/Categories';
-import TicketDesigner from './pages/TicketDesigner';
-import RoleGuard from './components/RoleGuard';
-import NotesReceivable from './pages/NotesReceivable';
-import NotesPayable from './pages/NotesPayable';
-import NavbarModern from './components/NavbarModern';
+import React from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { authService } from './services/api'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import Dashboard from './pages/Dashboard'
+import Settings from './pages/Settings'
+import GlobalInvoice from './pages/GlobalInvoice'
+import InvoiceList from './pages/InvoiceList'
+import ClientInvoice from './pages/ClientInvoice'
+import ClientInvoiceWorkflow from './pages/ClientInvoiceWorkflow'
+import SaleToInvoice from './pages/SaleToInvoice'
+import CashDrawer from './pages/CashDrawer'
+import ClientsPage from './pages/ClientsPage'
+import Pos from './pages/Pos'
+import ListSales from './pages/listSales'
+import ApiTest from './pages/ApiTest'
+import Products from './pages/Products'
+import Cotizaciones from './pages/Cotizaciones'
+import Team from './pages/Team'
+import Categories from './pages/Categories'
+import TicketDesigner from './pages/TicketDesigner'
+import RoleGuard from './components/RoleGuard'
+import NotesReceivable from './pages/NotesReceivable'
+import NotesPayable from './pages/NotesPayable'
+import NavbarModern from './components/NavbarModern'
 // Keep legacy Navbar available if other modules import it indirectly.
 function Navbar() {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const location = useLocation();
-  const user = authService.getCurrentUser();
+  const [isOpen, setIsOpen] = React.useState(false)
+  const location = useLocation()
+  const user = authService.getCurrentUser()
 
   const handleLogout = () => {
-    authService.logout();
-    window.location.href = '/login';
-  };
+    authService.logout()
+    window.location.href = '/login'
+  }
 
-  const isActive = (path) => location.pathname === path ? 'active' : '';
+  const isActive = (path) => (location.pathname === path ? 'active' : '')
 
   const navItems = [
     { path: '/pos', label: 'POS', icon: '🛒', primary: true },
@@ -48,24 +48,28 @@ function Navbar() {
     { path: '/notes-receivable', label: 'Notas por Cobrar', icon: '💳' },
     { path: '/notes-payable', label: 'Notas por Pagar', icon: '💰' },
     { path: '/cash-drawer', label: 'Cortes de Caja', icon: '➕' },
-    { path: '/settings', label: 'Configuracion', icon: '⚙️' },
-  ];
+    { path: '/settings', label: 'Configuracion', icon: '⚙️' }
+  ]
 
-  const primaryItems = navItems.filter(item => item.primary);
-  const secondaryItems = navItems.filter(item => !item.primary);
+  const primaryItems = navItems.filter((item) => item.primary)
+  const secondaryItems = navItems.filter((item) => !item.primary)
 
   return (
     <>
       <nav className="navbar">
         <h1 className="navbar-brand">npos</h1>
-        <button className={`hamburger ${isOpen ? 'open' : ''}`} onClick={() => setIsOpen(!isOpen)} aria-label="Menú">
+        <button
+          className={`hamburger ${isOpen ? 'open' : ''}`}
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label="Menú"
+        >
           <span></span>
           <span></span>
           <span></span>
         </button>
         <div className={`nav-menu ${isOpen ? 'open' : ''}`}>
           <div className="nav-primary">
-            {primaryItems.map(item => (
+            {primaryItems.map((item) => (
               <a
                 key={item.path}
                 href={item.path}
@@ -79,7 +83,7 @@ function Navbar() {
           </div>
           <div className="nav-divider"></div>
           <div className="nav-secondary">
-            {secondaryItems.map(item => (
+            {secondaryItems.map((item) => (
               <a
                 key={item.path}
                 href={item.path}
@@ -96,20 +100,22 @@ function Navbar() {
             <div className="user-info">
               <span className="user-email">👤 {user?.email || 'Usuario'}</span>
             </div>
-            <button className="btn-logout" onClick={handleLogout}>🚪 Salir</button>
+            <button className="btn-logout" onClick={handleLogout}>
+              🚪 Salir
+            </button>
           </div>
         </div>
       </nav>
       {isOpen && <div className="nav-overlay" onClick={() => setIsOpen(false)}></div>}
     </>
-  );
+  )
 }
 
 function ProtectedRoute({ children }) {
   if (!authService.isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />
   }
-  return children;
+  return children
 }
 
 function App() {
@@ -338,7 +344,7 @@ function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
+export default App

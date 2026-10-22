@@ -5,11 +5,21 @@
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--duration-base) var(--ease-standard);
 }
-.card-modern--elevated { box-shadow: var(--shadow-md); }
-.card-modern--pad-sm { padding: var(--space-4); }
-.card-modern--pad-md { padding: var(--space-6); }
-.card-modern--pad-lg { padding: var(--space-8); }
-.card-modern--pad-none { padding: 0; }
+.card-modern--elevated {
+  box-shadow: var(--shadow-md);
+}
+.card-modern--pad-sm {
+  padding: var(--space-4);
+}
+.card-modern--pad-md {
+  padding: var(--space-6);
+}
+.card-modern--pad-lg {
+  padding: var(--space-8);
+}
+.card-modern--pad-none {
+  padding: 0;
+}
 
 .card-modern__header {
   display: flex;
@@ -29,4 +39,6 @@
   color: var(--neutral-500);
   margin-top: var(--space-1);
 }
-.card-modern__action { flex-shrink: 0; }
+.card-modern__action {
+  flex-shrink: 0;
+}

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { productService } from '../services/productService';
-import { categoryService } from '../services/categoryService';
-import { useToast } from './ui/Toast.jsx';
-import './Modal.css';
+import { useState, useEffect, useRef } from 'react'
+import { productService } from '../services/productService'
+import { categoryService } from '../services/categoryService'
+import { useToast } from './ui/Toast.jsx'
+import './Modal.css'
 
 /**
  * Quick-add product modal for the POS.
@@ -16,78 +16,79 @@ import './Modal.css';
  * consistent with the rest of the cart.
  */
 export default function QuickAddProductModal({ onClose, onAddToCart }) {
-  const [tab, setTab] = useState('search'); // 'search' | 'create'
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [price, setPrice] = useState('');
-  const [creating, setCreating] = useState(false);
-  const searchInputRef = useRef(null);
-  const toast = useToast();
+  const [tab, setTab] = useState('search') // 'search' | 'create'
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loadingSearch, setLoadingSearch] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [quantity, setQuantity] = useState(1)
+  const [price, setPrice] = useState('')
+  const [creating, setCreating] = useState(false)
+  const searchInputRef = useRef(null)
+  const toast = useToast()
 
   // Focus search input whenever we land on the search tab
   useEffect(() => {
     if (tab === 'search') {
       // small delay so the input is mounted
-      const t = setTimeout(() => searchInputRef.current?.focus(), 30);
-      return () => clearTimeout(t);
+      const t = setTimeout(() => searchInputRef.current?.focus(), 30)
+      return () => clearTimeout(t)
     }
-  }, [tab]);
+  }, [tab])
 
   // Debounced search
   useEffect(() => {
-    if (tab !== 'search') return undefined;
+    if (tab !== 'search') return undefined
     if (!query.trim()) {
-      setResults([]);
-      return undefined;
+      setResults([])
+      return undefined
     }
-    const timer = setTimeout(() => searchProducts(query), 300);
-    return () => clearTimeout(timer);
-  }, [query, tab]);
+    const timer = setTimeout(() => searchProducts(query), 300)
+    return () => clearTimeout(timer)
+  }, [query, tab])
 
   const searchProducts = async (q) => {
-    setLoadingSearch(true);
+    setLoadingSearch(true)
     try {
       const res = await productService.getProducts({
         search: q.trim(),
         limit: 20,
-        activo: 'true',
-      });
+        activo: 'true'
+      })
       // response shape: { data: { products: [...], pagination } } per backend
-      const payload = res?.data?.products ?? res?.data ?? res?.products ?? [];
-      setResults(Array.isArray(payload) ? payload : []);
+      const payload = res?.data?.products ?? res?.data ?? res?.products ?? []
+      setResults(Array.isArray(payload) ? payload : [])
     } catch (err) {
-      setResults([]);
-      toast.error(err?.message || 'Error al buscar productos');
+      setResults([])
+      toast.error(err?.message || 'Error al buscar productos')
     } finally {
-      setLoadingSearch(false);
+      setLoadingSearch(false)
     }
-  };
+  }
 
   const handleSelectProduct = (product) => {
-    setSelectedProduct(product);
-    const basePrice = product.precioVenta ?? product.precioUnitario ?? 0;
-    setPrice(String(basePrice));
-    setQuantity(1);
-  };
+    setSelectedProduct(product)
+    const basePrice = product.precioVenta ?? product.precioUnitario ?? 0
+    setPrice(String(basePrice))
+    setQuantity(1)
+  }
 
   const handleAddSelected = () => {
-    if (!selectedProduct) return;
-    const qty = Math.max(1, parseInt(quantity, 10) || 1);
-    const unitPrice = parseFloat(price) || selectedProduct.precioVenta || selectedProduct.precioUnitario || 0;
+    if (!selectedProduct) return
+    const qty = Math.max(1, parseInt(quantity, 10) || 1)
+    const unitPrice =
+      parseFloat(price) || selectedProduct.precioVenta || selectedProduct.precioUnitario || 0
     onAddToCart(
       {
         ...selectedProduct,
         id: selectedProduct._id || selectedProduct.id,
         descripcion: selectedProduct.nombre || selectedProduct.descripcion || '',
-        valorUnitario: unitPrice,
+        valorUnitario: unitPrice
       },
-      qty,
-    );
-    onClose();
-  };
+      qty
+    )
+    onClose()
+  }
 
   // ── Create tab ─────────────────────────────────────────────────────────
   const initialCreate = {
@@ -97,11 +98,11 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
     categoria: 'General',
     categoriaId: '',
     claveUnidad: 'E48',
-    claveProdServ: '01010101',
-  };
-  const [formData, setFormData] = useState(initialCreate);
-  const [formErrors, setFormErrors] = useState({});
-  const [categories, setCategories] = useState([]);
+    claveProdServ: '01010101'
+  }
+  const [formData, setFormData] = useState(initialCreate)
+  const [formErrors, setFormErrors] = useState({})
+  const [categories, setCategories] = useState([])
 
   // Fetch the tenant's active categories once when the modal opens.
   // Mirrors ProductModal: the user picks a category and the SAT
@@ -109,58 +110,60 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
   // write time so a category rename in admin doesn't mutate
   // historical product SAT codes).
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    let cancelled = false
+    ;(async () => {
       try {
-        const list = await categoryService.list({ includeInactive: false });
-        if (!cancelled) setCategories(Array.isArray(list) ? list : []);
+        const list = await categoryService.list({ includeInactive: false })
+        if (!cancelled) setCategories(Array.isArray(list) ? list : [])
       } catch {
-        if (!cancelled) setCategories([]);
+        if (!cancelled) setCategories([])
       }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const onCategoryChange = (catId) => {
     if (!catId) {
-      setFormData((s) => ({ ...s, categoriaId: '', categoria: 'General' }));
-      return;
+      setFormData((s) => ({ ...s, categoriaId: '', categoria: 'General' }))
+      return
     }
-    const cat = categories.find((c) => c._id === catId);
-    if (!cat) return;
+    const cat = categories.find((c) => c._id === catId)
+    if (!cat) return
     setFormData((s) => ({
       ...s,
       categoriaId: cat._id,
       categoria: cat.nombre,
       claveProdServ: cat.claveProdServ,
-      claveUnidad: cat.claveUnidad,
-    }));
-  };
+      claveUnidad: cat.claveUnidad
+    }))
+  }
 
   const handleCreateChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: null }));
-  };
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: null }))
+  }
 
   const validateCreate = () => {
-    const errs = {};
-    if (!formData.nombre.trim()) errs.nombre = 'El nombre es requerido';
-    const price = parseFloat(formData.precioVenta);
+    const errs = {}
+    if (!formData.nombre.trim()) errs.nombre = 'El nombre es requerido'
+    const price = parseFloat(formData.precioVenta)
     if (!formData.precioVenta || Number.isNaN(price) || price <= 0) {
-      errs.precioVenta = 'Precio de venta requerido';
+      errs.precioVenta = 'Precio de venta requerido'
     }
-    return errs;
-  };
+    return errs
+  }
 
   const handleCreate = async (e) => {
-    e.preventDefault();
-    const errs = validateCreate();
+    e.preventDefault()
+    const errs = validateCreate()
     if (Object.keys(errs).length) {
-      setFormErrors(errs);
-      return;
+      setFormErrors(errs)
+      return
     }
-    setCreating(true);
+    setCreating(true)
     try {
       const payload = {
         ...formData,
@@ -171,39 +174,39 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
         precioVenta: parseFloat(formData.precioVenta),
         // also keep legacy field for backends that still read it
         precioUnitario: parseFloat(formData.precioVenta),
-        activo: true,
-      };
-      const res = await productService.createProduct(payload);
-      const newProduct = res?.data ?? res;
-      const qty = Math.max(1, parseInt(quantity, 10) || 1);
-      toast.success(`Producto "${newProduct.nombre}" creado`);
+        activo: true
+      }
+      const res = await productService.createProduct(payload)
+      const newProduct = res?.data ?? res
+      const qty = Math.max(1, parseInt(quantity, 10) || 1)
+      toast.success(`Producto "${newProduct.nombre}" creado`)
       onAddToCart(
         {
           ...newProduct,
           id: newProduct._id || newProduct.id,
           descripcion: newProduct.nombre,
-          valorUnitario: parseFloat(formData.precioVenta),
+          valorUnitario: parseFloat(formData.precioVenta)
         },
-        qty,
-      );
-      onClose();
+        qty
+      )
+      onClose()
     } catch (err) {
-      setFormErrors({ form: err?.message || 'Error al crear producto' });
+      setFormErrors({ form: err?.message || 'Error al crear producto' })
     } finally {
-      setCreating(false);
+      setCreating(false)
     }
-  };
+  }
 
   const switchToCreate = () => {
-    setTab('create');
-    setSelectedProduct(null);
-    setFormData({ ...initialCreate, nombre: query });
-  };
+    setTab('create')
+    setSelectedProduct(null)
+    setFormData({ ...initialCreate, nombre: query })
+  }
 
   const resetCreate = () => {
-    setFormData({ ...initialCreate });
-    setFormErrors({});
-  };
+    setFormData({ ...initialCreate })
+    setFormErrors({})
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -215,30 +218,30 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
         {/* Header */}
         <div className="modal-header">
           <h2>➕ Agregar Producto</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Cerrar">&times;</button>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar">
+            &times;
+          </button>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', borderBottom: '2px solid #eee', padding: '0 16px' }}>
           <button
             type="button"
-            onClick={() => { setTab('search'); setSelectedProduct(null); }}
+            onClick={() => {
+              setTab('search')
+              setSelectedProduct(null)
+            }}
             style={tabBtnStyle(tab === 'search')}
           >
             🔍 Buscar
           </button>
-          <button
-            type="button"
-            onClick={switchToCreate}
-            style={tabBtnStyle(tab === 'create')}
-          >
+          <button type="button" onClick={switchToCreate} style={tabBtnStyle(tab === 'create')}>
             ✨ Crear nuevo
           </button>
         </div>
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-
           {/* SEARCH TAB — list view */}
           {tab === 'search' && !selectedProduct && (
             <div>
@@ -251,14 +254,31 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   style={{
-                    width: '100%', padding: '10px 12px', paddingLeft: '36px',
-                    fontSize: '14px', border: '2px solid #e0e0e0', borderRadius: '8px',
-                    boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.2s',
+                    width: '100%',
+                    padding: '10px 12px',
+                    paddingLeft: '36px',
+                    fontSize: '14px',
+                    border: '2px solid #e0e0e0',
+                    borderRadius: '8px',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
                   }}
                   onFocus={(e) => (e.target.style.borderColor = '#667eea')}
                   onBlur={(e) => (e.target.style.borderColor = '#e0e0e0')}
                 />
-                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', pointerEvents: 'none' }}>🔍</span>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '16px',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  🔍
+                </span>
               </div>
 
               {loadingSearch && (
@@ -266,7 +286,9 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
               )}
 
               {!loadingSearch && query && results.length === 0 && (
-                <p style={{ textAlign: 'center', color: '#999', fontSize: '13px', margin: '16px 0' }}>
+                <p
+                  style={{ textAlign: 'center', color: '#999', fontSize: '13px', margin: '16px 0' }}
+                >
                   No se encontraron productos para &quot;{query}&quot;
                 </p>
               )}
@@ -277,21 +299,44 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                     key={product._id || product.id}
                     onClick={() => handleSelectProduct(product)}
                     style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 12px', marginBottom: '6px', borderRadius: '8px',
-                      border: '1px solid #eee', cursor: 'pointer', transition: 'all 0.15s',
-                      background: '#f9f9f9',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 12px',
+                      marginBottom: '6px',
+                      borderRadius: '8px',
+                      border: '1px solid #eee',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      background: '#f9f9f9'
                     }}
-                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#667eea'; e.currentTarget.style.background = '#f0f4ff'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#eee'; e.currentTarget.style.background = '#f9f9f9'; }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = '#667eea'
+                      e.currentTarget.style.background = '#f0f4ff'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = '#eee'
+                      e.currentTarget.style.background = '#f9f9f9'
+                    }}
                   >
                     <div>
-                      <div style={{ fontWeight: '600', fontSize: '13px', color: '#333' }}>{product.nombre}</div>
+                      <div style={{ fontWeight: '600', fontSize: '13px', color: '#333' }}>
+                        {product.nombre}
+                      </div>
                       <div style={{ fontSize: '11px', color: '#999' }}>
-                        {product.sku ? `SKU: ${product.sku} · ` : ''}{product.categoria || 'Sin categoría'}
+                        {product.sku ? `SKU: ${product.sku} · ` : ''}
+                        {product.categoria || 'Sin categoría'}
                       </div>
                     </div>
-                    <div style={{ fontWeight: '700', color: '#667eea', fontSize: '14px', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                    <div
+                      style={{
+                        fontWeight: '700',
+                        color: '#667eea',
+                        fontSize: '14px',
+                        whiteSpace: 'nowrap',
+                        marginLeft: '12px'
+                      }}
+                    >
                       ${(product.precioVenta || product.precioUnitario || 0).toFixed(2)}
                     </div>
                   </div>
@@ -299,12 +344,26 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
               </div>
 
               {query && !loadingSearch && results.length === 0 && (
-                <p style={{ textAlign: 'center', marginTop: '12px', fontSize: '13px', color: '#666' }}>
+                <p
+                  style={{
+                    textAlign: 'center',
+                    marginTop: '12px',
+                    fontSize: '13px',
+                    color: '#666'
+                  }}
+                >
                   ¿No lo encontraste?{' '}
                   <button
                     type="button"
                     onClick={switchToCreate}
-                    style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '600', textDecoration: 'underline' }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#667eea',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      textDecoration: 'underline'
+                    }}
                   >
                     Créalo aquí
                   </button>
@@ -316,31 +375,61 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
           {/* SEARCH TAB — selected product: pick qty + price */}
           {tab === 'search' && selectedProduct && (
             <div>
-              <div style={{
-                background: 'linear-gradient(135deg, #667eea22, #764ba222)',
-                border: '2px solid #667eea44', borderRadius: '10px', padding: '14px',
-                marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, #667eea22, #764ba222)',
+                  border: '2px solid #667eea44',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '15px', color: '#333' }}>{selectedProduct.nombre}</div>
+                  <div style={{ fontWeight: '700', fontSize: '15px', color: '#333' }}>
+                    {selectedProduct.nombre}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#666' }}>
-                    {selectedProduct.sku ? `SKU: ${selectedProduct.sku} · ` : ''}{selectedProduct.categoria || 'General'}
+                    {selectedProduct.sku ? `SKU: ${selectedProduct.sku} · ` : ''}
+                    {selectedProduct.categoria || 'General'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
-                    Precio catálogo: <strong>${(selectedProduct.precioVenta || selectedProduct.precioUnitario || 0).toFixed(2)}</strong>
+                    Precio catálogo:{' '}
+                    <strong>
+                      $
+                      {(selectedProduct.precioVenta || selectedProduct.precioUnitario || 0).toFixed(
+                        2
+                      )}
+                    </strong>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedProduct(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#999', padding: '4px' }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '20px',
+                    color: '#999',
+                    padding: '4px'
+                  }}
                   aria-label="Cambiar producto"
                 >
                   ✕
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '16px'
+                }}
+              >
                 <div>
                   <label style={labelStyle}>Cantidad *</label>
                   <input
@@ -365,10 +454,23 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                 </div>
               </div>
 
-              <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '12px', marginBottom: '16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Importe total</div>
+              <div
+                style={{
+                  background: '#f8f9fa',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                  Importe total
+                </div>
                 <div style={{ fontSize: '24px', fontWeight: '800', color: '#667eea' }}>
-                  ${((parseFloat(price) || parseFloat(selectedProduct.precioVenta) || 0) * quantity).toFixed(2)}
+                  $
+                  {(
+                    (parseFloat(price) || parseFloat(selectedProduct.precioVenta) || 0) * quantity
+                  ).toFixed(2)}
                 </div>
               </div>
 
@@ -376,11 +478,16 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                 type="button"
                 onClick={handleAddSelected}
                 style={{
-                  width: '100%', padding: '12px',
+                  width: '100%',
+                  padding: '12px',
                   background: 'linear-gradient(135deg, #667eea, #764ba2)',
-                  color: 'white', border: 'none', borderRadius: '8px',
-                  fontSize: '14px', fontWeight: '700', cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(102,126,234,0.3)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(102,126,234,0.3)'
                 }}
               >
                 ➕ Agregar al carrito (×{quantity})
@@ -400,7 +507,10 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                     value={formData.nombre}
                     onChange={handleCreateChange}
                     placeholder="Ej: Hamburguesa Especial"
-                    style={{ ...inputStyle, borderColor: formErrors.nombre ? '#dc3545' : '#dee2e6' }}
+                    style={{
+                      ...inputStyle,
+                      borderColor: formErrors.nombre ? '#dc3545' : '#dee2e6'
+                    }}
                   />
                   {formErrors.nombre && <span style={errorText}>{formErrors.nombre}</span>}
                 </div>
@@ -436,9 +546,11 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                 </div>
                 {categories.length === 0 && (
                   <small style={{ color: '#666', fontSize: '11px', marginTop: '-4px' }}>
-                    Aún no hay categorías. Crea una en
-                    {' '}<a href="/categories" target="_blank" rel="noreferrer">Categorías</a>
-                    {' '}para heredar los códigos SAT automáticamente.
+                    Aún no hay categorías. Crea una en{' '}
+                    <a href="/categories" target="_blank" rel="noreferrer">
+                      Categorías
+                    </a>{' '}
+                    para heredar los códigos SAT automáticamente.
                   </small>
                 )}
 
@@ -453,9 +565,14 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                       placeholder="0.00"
                       step="0.01"
                       min="0"
-                      style={{ ...inputStyle, borderColor: formErrors.precioVenta ? '#dc3545' : '#dee2e6' }}
+                      style={{
+                        ...inputStyle,
+                        borderColor: formErrors.precioVenta ? '#dc3545' : '#dee2e6'
+                      }}
                     />
-                    {formErrors.precioVenta && <span style={errorText}>{formErrors.precioVenta}</span>}
+                    {formErrors.precioVenta && (
+                      <span style={errorText}>{formErrors.precioVenta}</span>
+                    )}
                   </div>
                   <div>
                     <label style={labelStyle}>Cantidad</label>
@@ -497,7 +614,16 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                 </div>
 
                 {formErrors.form && (
-                  <div style={{ background: '#fff5f5', border: '1px solid #dc3545', borderRadius: '6px', padding: '8px', fontSize: '13px', color: '#dc3545' }}>
+                  <div
+                    style={{
+                      background: '#fff5f5',
+                      border: '1px solid #dc3545',
+                      borderRadius: '6px',
+                      padding: '8px',
+                      fontSize: '13px',
+                      color: '#dc3545'
+                    }}
+                  >
                     {formErrors.form}
                   </div>
                 )}
@@ -507,7 +633,16 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  style={{ flex: 1, padding: '10px', background: '#f0f0f0', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#666' }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    background: '#f0f0f0',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    color: '#666'
+                  }}
                 >
                   Cancelar
                 </button>
@@ -515,12 +650,15 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
                   type="submit"
                   disabled={creating}
                   style={{
-                    flex: 2, padding: '10px',
+                    flex: 2,
+                    padding: '10px',
                     background: creating ? '#aaa' : 'linear-gradient(135deg, #667eea, #764ba2)',
-                    color: 'white', border: 'none', borderRadius: '8px',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
                     fontWeight: '700',
                     cursor: creating ? 'not-allowed' : 'pointer',
-                    boxShadow: creating ? 'none' : '0 4px 12px rgba(102,126,234,0.3)',
+                    boxShadow: creating ? 'none' : '0 4px 12px rgba(102,126,234,0.3)'
                   }}
                 >
                   {creating ? '⏳ Creando…' : `✨ Crear y agregar (×${quantity})`}
@@ -531,26 +669,38 @@ export default function QuickAddProductModal({ onClose, onAddToCart }) {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 const tabBtnStyle = (active) => ({
-  flex: 1, padding: '10px', background: 'none', border: 'none',
+  flex: 1,
+  padding: '10px',
+  background: 'none',
+  border: 'none',
   borderBottom: active ? '3px solid #667eea' : '3px solid transparent',
-  cursor: 'pointer', fontWeight: active ? '700' : '400',
-  color: active ? '#667eea' : '#999', fontSize: '14px',
-  transition: 'all 0.2s',
-});
+  cursor: 'pointer',
+  fontWeight: active ? '700' : '400',
+  color: active ? '#667eea' : '#999',
+  fontSize: '14px',
+  transition: 'all 0.2s'
+})
 
 const inputStyle = {
-  width: '100%', padding: '8px 10px', fontSize: '13px',
-  borderRadius: '6px', border: '1px solid #dee2e6',
-  boxSizing: 'border-box', outline: 'none',
-};
+  width: '100%',
+  padding: '8px 10px',
+  fontSize: '13px',
+  borderRadius: '6px',
+  border: '1px solid #dee2e6',
+  boxSizing: 'border-box',
+  outline: 'none'
+}
 
 const labelStyle = {
-  fontSize: '12px', fontWeight: '600', color: '#495057',
-  display: 'block', marginBottom: '4px',
-};
+  fontSize: '12px',
+  fontWeight: '600',
+  color: '#495057',
+  display: 'block',
+  marginBottom: '4px'
+}
 
-const errorText = { fontSize: '11px', color: '#dc3545' };
+const errorText = { fontSize: '11px', color: '#dc3545' }

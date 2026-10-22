@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   testMatch: /notes-identity\.spec\.js/,
@@ -10,7 +10,7 @@ export default defineConfig({
     headless: true,
     viewport: { width: 1280, height: 800 },
     launchOptions: {
-      executablePath: '/root/.cache/ms-playwright/chromium-1223/chrome-linux/chrome',
-    },
-  },
-});
+      executablePath: '/root/.cache/ms-playwright/chromium-1223/chrome-linux/chrome'
+    }
+  }
+})

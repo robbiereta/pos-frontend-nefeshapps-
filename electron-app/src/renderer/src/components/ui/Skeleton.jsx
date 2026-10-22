@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 
 export function Skeleton({ width = '100%', height = 14, radius = 6, className = '', style = {} }) {
   return (
@@ -7,7 +7,7 @@ export function Skeleton({ width = '100%', height = 14, radius = 6, className = 
       style={{ display: 'inline-block', width, height, borderRadius: radius, ...style }}
       aria-hidden
     />
-  );
+  )
 }
 
 export function SkeletonStack({ rows = 3, gap = 12, lastWidth = '60%' }) {
@@ -17,5 +17,5 @@ export function SkeletonStack({ rows = 3, gap = 12, lastWidth = '60%' }) {
         <Skeleton key={i} width={i === rows - 1 ? lastWidth : '100%'} height={14} />
       ))}
     </div>
-  );
+  )
 }

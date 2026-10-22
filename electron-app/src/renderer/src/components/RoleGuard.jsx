@@ -11,38 +11,38 @@
 //   </Route>
 //
 // If `allow` is omitted, any authenticated user passes.
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom'
 
 const readUser = () => {
   try {
-    const raw = localStorage.getItem('user');
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const raw = localStorage.getItem('user')
+    if (!raw) return null
+    return JSON.parse(raw)
   } catch {
-    return null;
+    return null
   }
-};
+}
 
 export default function RoleGuard({ allow, children }) {
-  const location = useLocation();
-  const user = readUser();
+  const location = useLocation()
+  const user = readUser()
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
   if (!allow || allow.length === 0) {
-    return children;
+    return children
   }
 
   // `role` on the user object is the tenantRole returned by the
   // backend's team endpoints. Fall back to 'owner' for the very
   // first login before the team list is fetched — the backend
   // still enforces the real check on every request.
-  const role = user.role || 'owner';
+  const role = user.role || 'owner'
   if (!allow.includes(role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/" replace />
   }
 
-  return children;
+  return children
 }

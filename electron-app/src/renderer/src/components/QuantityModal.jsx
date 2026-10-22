@@ -1,63 +1,68 @@
-import { useState } from 'react';
-import './Modal.css';
+import { useState } from 'react'
+import './Modal.css'
 
 export default function QuantityModal({ product, onClose, onSave }) {
-  const [operation, setOperation] = useState('set');
-  const [valor, setValor] = useState('');
-  const [error, setError] = useState('');
+  const [operation, setOperation] = useState('set')
+  const [valor, setValor] = useState('')
+  const [error, setError] = useState('')
 
   const calculateNewQuantity = () => {
-    const currentQuantity = product.cantidad || 0;
-    const amount = parseInt(valor) || 0;
+    const currentQuantity = product.cantidad || 0
+    const amount = parseInt(valor) || 0
 
     switch (operation) {
       case 'increase':
-        return currentQuantity + amount;
+        return currentQuantity + amount
       case 'decrease':
-        return Math.max(0, currentQuantity - amount);
+        return Math.max(0, currentQuantity - amount)
       case 'set':
-        return amount;
+        return amount
       default:
-        return currentQuantity;
+        return currentQuantity
     }
-  };
+  }
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!valor || parseInt(valor) < 0) {
-      setError('Ingrese un valor válido mayor o igual a 0');
-      return;
+      setError('Ingrese un valor válido mayor o igual a 0')
+      return
     }
 
-    const newQuantity = calculateNewQuantity();
+    const newQuantity = calculateNewQuantity()
 
     if (operation === 'decrease' && newQuantity < 0) {
-      setError('La cantidad no puede ser negativa');
-      return;
+      setError('La cantidad no puede ser negativa')
+      return
     }
 
-    onSave(operation, parseInt(valor));
-  };
+    onSave(operation, parseInt(valor))
+  }
 
   const operationLabels = {
     increase: 'Aumentar',
     decrease: 'Disminuir',
-    set: 'Establecer',
-  };
+    set: 'Establecer'
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content modal-small" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Ajustar Cantidad</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <button className="modal-close" onClick={onClose}>
+            &times;
+          </button>
         </div>
 
         <div className="product-info">
           <strong>{product.nombre}</strong>
           <div className="current-stock">
-            Stock actual: <span className="stock-value">{product.cantidad || 0} {product.unidad}</span>
+            Stock actual:{' '}
+            <span className="stock-value">
+              {product.cantidad || 0} {product.unidad}
+            </span>
           </div>
         </div>
 
@@ -95,8 +100,8 @@ export default function QuantityModal({ product, onClose, onSave }) {
               type="number"
               value={valor}
               onChange={(e) => {
-                setValor(e.target.value);
-                setError('');
+                setValor(e.target.value)
+                setError('')
               }}
               min="0"
               placeholder="Ingrese la cantidad"
@@ -130,5 +135,5 @@ export default function QuantityModal({ product, onClose, onSave }) {
         </form>
       </div>
     </div>
-  );
+  )
 }

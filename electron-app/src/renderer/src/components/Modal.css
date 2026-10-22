@@ -141,7 +141,7 @@
   cursor: pointer;
 }
 
-.checkbox-group input[type="checkbox"] {
+.checkbox-group input[type='checkbox'] {
   width: auto;
   cursor: pointer;
 }

@@ -1,5 +1,5 @@
-import React from 'react';
-import './Button.css';
+import React from 'react'
+import './Button.css'
 
 /**
  * Modern button.
@@ -24,10 +24,10 @@ export default function Button({
     `btn-modern--${size}`,
     fullWidth ? 'btn-modern--full' : '',
     loading ? 'btn-modern--loading' : '',
-    className,
+    className
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
 
   return (
     <button className={classes} disabled={disabled || loading} {...rest}>
@@ -35,5 +35,5 @@ export default function Button({
       <span className="btn-modern__label">{children}</span>
       {rightIcon}
     </button>
-  );
+  )
 }

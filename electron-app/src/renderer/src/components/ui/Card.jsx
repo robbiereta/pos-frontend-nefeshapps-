@@ -1,5 +1,5 @@
-import React from 'react';
-import './Card.css';
+import React from 'react'
+import './Card.css'
 
 export default function Card({
   title,
@@ -15,10 +15,10 @@ export default function Card({
     'card-modern',
     `card-modern--pad-${padding}`,
     elevated ? 'card-modern--elevated' : '',
-    className,
+    className
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
 
   return (
     <section className={classes} {...rest}>
@@ -33,5 +33,5 @@ export default function Card({
       )}
       {children}
     </section>
-  );
+  )
 }

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import ProductImageUpload from './ProductImageUpload';
-import { categoryService } from '../services/categoryService';
-import './Modal.css';
+import { useState, useEffect } from 'react'
+import ProductImageUpload from './ProductImageUpload'
+import { categoryService } from '../services/categoryService'
+import './Modal.css'
 
 export default function ProductModal({ product, onClose, onSave }) {
   const [formData, setFormData] = useState({
@@ -21,11 +21,11 @@ export default function ProductModal({ product, onClose, onSave }) {
     claveUnidad: 'H87',
     claveProdServ: '01010101',
     activo: true,
-    tags: '',
-  });
+    tags: ''
+  })
 
-  const [errors, setErrors] = useState({});
-  const [categories, setCategories] = useState([]);
+  const [errors, setErrors] = useState({})
+  const [categories, setCategories] = useState([])
 
   // Fetch the tenant's active categories once when the modal
   // opens. The dropdown uses them to pre-fill the SAT codes; the
@@ -33,17 +33,19 @@ export default function ProductModal({ product, onClose, onSave }) {
   // category rename in admin doesn't accidentally mutate
   // historical product SAT codes.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
+    let cancelled = false
+    ;(async () => {
       try {
-        const list = await categoryService.list({ includeInactive: false });
-        if (!cancelled) setCategories(Array.isArray(list) ? list : []);
+        const list = await categoryService.list({ includeInactive: false })
+        if (!cancelled) setCategories(Array.isArray(list) ? list : [])
       } catch {
-        if (!cancelled) setCategories([]);
+        if (!cancelled) setCategories([])
       }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (product) {
@@ -64,20 +66,20 @@ export default function ProductModal({ product, onClose, onSave }) {
         claveUnidad: product.claveUnidad || 'H87',
         claveProdServ: product.claveProdServ || '01010101',
         activo: product.activo !== false,
-        tags: Array.isArray(product.tags) ? product.tags.join(', ') : '',
-      });
+        tags: Array.isArray(product.tags) ? product.tags.join(', ') : ''
+      })
     }
-  }, [product]);
+  }, [product])
 
   // When the user picks a category, pre-fill the SAT fields. The
   // user can still edit them after — useful when a product
   // matches the category for everything except the unit (e.g. a
   // "Bebidas" sold by kilogram instead of by pieza).
   const onCategoryChange = (catId) => {
-    const cat = categories.find((c) => c._id === catId);
+    const cat = categories.find((c) => c._id === catId)
     if (!cat) {
-      setFormData((s) => ({ ...s, categoriaId: catId, categoria: '' }));
-      return;
+      setFormData((s) => ({ ...s, categoriaId: catId, categoria: '' }))
+      return
     }
     setFormData((s) => ({
       ...s,
@@ -87,41 +89,41 @@ export default function ProductModal({ product, onClose, onSave }) {
       claveUnidad: cat.claveUnidad,
       unidad: cat.unidad,
       objetoImp: cat.objetoImp,
-      tasaIVA: s.tasaIVA ?? cat.tasaIVA,
-    }));
-  };
+      tasaIVA: s.tasaIVA ?? cat.tasaIVA
+    }))
+  }
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    const { name, value, type, checked } = e.target
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+      [name]: type === 'checkbox' ? checked : value
+    }))
     // Clear error for this field
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
+      setErrors((prev) => ({ ...prev, [name]: null }))
     }
-  };
+  }
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors = {}
 
     if (!formData.nombre.trim()) {
-      newErrors.nombre = 'El nombre es requerido';
+      newErrors.nombre = 'El nombre es requerido'
     }
 
     if (!formData.precioUnitario || formData.precioUnitario <= 0) {
-      newErrors.precioUnitario = 'El precio unitario debe ser mayor a 0';
+      newErrors.precioUnitario = 'El precio unitario debe ser mayor a 0'
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    if (!validate()) return;
+    if (!validate()) return
 
     const dataToSave = {
       ...formData,
@@ -135,18 +137,25 @@ export default function ProductModal({ product, onClose, onSave }) {
       cantidad: parseInt(formData.cantidad) || 0,
       cantidadMinima: formData.cantidadMinima ? parseInt(formData.cantidadMinima) : undefined,
       cantidadMaxima: formData.cantidadMaxima ? parseInt(formData.cantidadMaxima) : undefined,
-      tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-    };
+      tags: formData.tags
+        ? formData.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : []
+    }
 
-    onSave(dataToSave);
-  };
+    onSave(dataToSave)
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{product ? 'Editar Producto' : 'Nuevo Producto'}</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <button className="modal-close" onClick={onClose}>
+            &times;
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-form">
@@ -203,8 +212,8 @@ export default function ProductModal({ product, onClose, onSave }) {
               </select>
               {categories.length === 0 && (
                 <small className="muted">
-                  Aún no hay categorías. Crea una en <a href="/categories">Categorías</a>
-                  {' '}para heredar los códigos SAT automáticamente.
+                  Aún no hay categorías. Crea una en <a href="/categories">Categorías</a> para
+                  heredar los códigos SAT automáticamente.
                 </small>
               )}
             </div>
@@ -362,10 +371,7 @@ export default function ProductModal({ product, onClose, onSave }) {
           </div>
 
           {product?._id && (
-            <ProductImageUpload
-              productId={product._id}
-              imagenes={product.imagenes || []}
-            />
+            <ProductImageUpload productId={product._id} imagenes={product.imagenes || []} />
           )}
 
           <div className="modal-footer">
@@ -379,5 +385,5 @@ export default function ProductModal({ product, onClose, onSave }) {
         </form>
       </div>
     </div>
-  );
+  )
 }

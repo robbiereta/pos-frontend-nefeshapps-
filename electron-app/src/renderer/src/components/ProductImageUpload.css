@@ -74,15 +74,19 @@
   font-weight: 600;
 }
 .piu-btn-ghost {
-  background: rgba(255,255,255,0.92);
+  background: rgba(255, 255, 255, 0.92);
   color: #2d5fc4;
 }
-.piu-btn-ghost:hover { background: #fff; }
+.piu-btn-ghost:hover {
+  background: #fff;
+}
 .piu-btn-danger {
-  background: rgba(231,76,60,0.92);
+  background: rgba(231, 76, 60, 0.92);
   color: #fff;
 }
-.piu-btn-danger:hover { background: #c0392b; }
+.piu-btn-danger:hover {
+  background: #c0392b;
+}
 
 .piu-badge {
   background: #4f8cff;

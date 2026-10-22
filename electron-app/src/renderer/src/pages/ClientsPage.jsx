@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
-import { clientService } from '../services/api';
-import { useToast } from '../components/ui/Toast.jsx';
-import './ClientsPage.css';
+import { useState, useEffect } from 'react'
+import { clientService } from '../services/api'
+import { useToast } from '../components/ui/Toast.jsx'
+import './ClientsPage.css'
 
 export default function ClientsPage() {
-  const toast = useToast();
-  const [clients, setClients] = useState([]);
-  const [displayedClients, setDisplayedClients] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const toast = useToast()
+  const [clients, setClients] = useState([])
+  const [displayedClients, setDisplayedClients] = useState([])
+  const [showForm, setShowForm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const [formData, setFormData] = useState({
     rfc: '',
     nombre: '',
@@ -25,66 +25,67 @@ export default function ClientsPage() {
     estado: '',
     codigoPostal: '',
     usoCFDI: 'G01',
-    notas: '',
-  });
+    notas: ''
+  })
 
   useEffect(() => {
-    loadClients();
-  }, []);
+    loadClients()
+  }, [])
 
   useEffect(() => {
-    const filtered = clients.filter(client =>
-      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = clients.filter(
+      (client) =>
+        client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    setDisplayedClients(filtered.slice(startIndex, endIndex));
-  }, [searchQuery, currentPage, clients]);
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    setDisplayedClients(filtered.slice(startIndex, endIndex))
+  }, [searchQuery, currentPage, clients])
 
   const loadClients = async () => {
     try {
-      setLoading(true);
-      const response = await clientService.getAllClients();
-      setClients(response.data || []);
+      setLoading(true)
+      const response = await clientService.getAllClients()
+      setClients(response.data || [])
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+    const { name, value } = e.target
+    setFormData((prev) => ({
       ...prev,
       [name]: value
-    }));
-  };
+    }))
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
-      setLoading(true);
+      setLoading(true)
       if (editingId) {
-        await clientService.updateClient(editingId, formData);
-        toast.success('Cliente actualizado');
+        await clientService.updateClient(editingId, formData)
+        toast.success('Cliente actualizado')
       } else {
-        await clientService.createClient(formData);
-        toast.success('Cliente creado');
+        await clientService.createClient(formData)
+        toast.success('Cliente creado')
       }
-      await loadClients();
-      resetForm();
-      setShowForm(false);
+      await loadClients()
+      resetForm()
+      setShowForm(false)
     } catch (err) {
-      setError(err.message);
-      toast.error(err.message || 'Error al guardar cliente');
+      setError(err.message)
+      toast.error(err.message || 'Error al guardar cliente')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleEdit = (client) => {
     setFormData({
@@ -98,27 +99,27 @@ export default function ClientsPage() {
       estado: client.estado || '',
       codigoPostal: client.codigoPostal,
       usoCFDI: client.usoCFDI || 'G01',
-      notas: client.notas || '',
-    });
-    setEditingId(client._id);
-    setShowForm(true);
-  };
+      notas: client.notas || ''
+    })
+    setEditingId(client._id)
+    setShowForm(true)
+  }
 
   const handleDelete = async (id) => {
     if (confirm('¿Eliminar este cliente?')) {
       try {
-        setLoading(true);
-        await clientService.deleteClient(id);
-        toast.success('Cliente eliminado');
-        await loadClients();
+        setLoading(true)
+        await clientService.deleteClient(id)
+        toast.success('Cliente eliminado')
+        await loadClients()
       } catch (err) {
-        setError(err.message);
-        toast.error(err.message || 'Error al eliminar cliente');
+        setError(err.message)
+        toast.error(err.message || 'Error al eliminar cliente')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-  };
+  }
 
   const resetForm = () => {
     setFormData({
@@ -132,10 +133,10 @@ export default function ClientsPage() {
       estado: '',
       codigoPostal: '',
       usoCFDI: 'G01',
-      notas: '',
-    });
-    setEditingId(null);
-  };
+      notas: ''
+    })
+    setEditingId(null)
+  }
 
   return (
     <div className="clients-page">
@@ -144,8 +145,8 @@ export default function ClientsPage() {
         <button
           className="btn btn-primary"
           onClick={() => {
-            resetForm();
-            setShowForm(!showForm);
+            resetForm()
+            setShowForm(!showForm)
           }}
         >
           {showForm ? 'Cancelar' : '+ Nuevo Cliente'}
@@ -279,18 +280,16 @@ export default function ClientsPage() {
                     <option value="609">609 - Sector financiero</option>
                     <option value="610">610 - Ingresos por dividendos</option>
                     <option value="611">611 - Otros ingresos por fracciones XI-XV</option>
-                    <option value="612">612 - Personas físicas con actividades empresariales</option>
+                    <option value="612">
+                      612 - Personas físicas con actividades empresariales
+                    </option>
                     <option value="614">614 - Ganancias en capital</option>
                     <option value="616">616 - Sin obligación fiscal</option>
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Uso de CFDI</label>
-                  <select
-                    name="usoCFDI"
-                    value={formData.usoCFDI}
-                    onChange={handleInputChange}
-                  >
+                  <select name="usoCFDI" value={formData.usoCFDI} onChange={handleInputChange}>
                     <option value="G01">G01 - Adquisición de mercancías</option>
                     <option value="G02">G02 - Devoluciones, descuentos o bonificaciones</option>
                     <option value="G03">G03 - Gastos en general</option>
@@ -354,8 +353,8 @@ export default function ClientsPage() {
           placeholder="Buscar por nombre, RFC o email..."
           value={searchQuery}
           onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
+            setSearchQuery(e.target.value)
+            setCurrentPage(1)
           }}
           style={{
             width: '100%',
@@ -387,41 +386,48 @@ export default function ClientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayedClients.map(client => (
-                <tr key={client._id}>
-                  <td className="rfc">{client.rfc}</td>
-                  <td className="nombre">{client.nombre}</td>
-                  <td className="email">{client.email || '-'}</td>
-                  <td className="telefono">{client.telefono || '-'}</td>
-                  <td className="cp">{client.codigoPostal}</td>
-                  <td className="regimen">{client.regimenFiscal}</td>
-                  <td className="acciones">
-                    <button
-                      className="btn btn-sm btn-primary"
-                      onClick={() => handleEdit(client)}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => handleDelete(client._id)}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                {displayedClients.map((client) => (
+                  <tr key={client._id}>
+                    <td className="rfc">{client.rfc}</td>
+                    <td className="nombre">{client.nombre}</td>
+                    <td className="email">{client.email || '-'}</td>
+                    <td className="telefono">{client.telefono || '-'}</td>
+                    <td className="cp">{client.codigoPostal}</td>
+                    <td className="regimen">{client.regimenFiscal}</td>
+                    <td className="acciones">
+                      <button className="btn btn-sm btn-primary" onClick={() => handleEdit(client)}>
+                        Editar
+                      </button>
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => handleDelete(client._id)}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
             {Math.ceil(
-              clients.filter(client =>
-                client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+              clients.filter(
+                (client) =>
+                  client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
               ).length / itemsPerPage
             ) > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '20px',
+                  flexWrap: 'wrap'
+                }}
+              >
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
@@ -431,7 +437,7 @@ export default function ClientsPage() {
                   ◀◀ Primera
                 </button>
                 <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                   className="btn"
                   style={{ padding: '8px 12px', opacity: currentPage === 1 ? 0.5 : 1 }}
@@ -440,38 +446,60 @@ export default function ClientsPage() {
                 </button>
 
                 <span style={{ margin: '0 8px', fontSize: '14px', fontWeight: '600' }}>
-                  Página {currentPage} de {Math.ceil(
-                    clients.filter(client =>
-                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                  Página {currentPage} de{' '}
+                  {Math.ceil(
+                    clients.filter(
+                      (client) =>
+                        client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
                     ).length / itemsPerPage
                   )}
                 </span>
 
                 <button
-                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(
-                    clients.filter(client =>
-                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
-                    ).length / itemsPerPage
-                  ), p + 1))}
-                  disabled={currentPage === Math.ceil(
-                    clients.filter(client =>
-                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
-                    ).length / itemsPerPage
-                  )}
+                  onClick={() =>
+                    setCurrentPage((p) =>
+                      Math.min(
+                        Math.ceil(
+                          clients.filter(
+                            (client) =>
+                              client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                          ).length / itemsPerPage
+                        ),
+                        p + 1
+                      )
+                    )
+                  }
+                  disabled={
+                    currentPage ===
+                    Math.ceil(
+                      clients.filter(
+                        (client) =>
+                          client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                      ).length / itemsPerPage
+                    )
+                  }
                   className="btn"
-                  style={{ padding: '8px 12px', opacity: currentPage === Math.ceil(
-                    clients.filter(client =>
-                      client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
-                    ).length / itemsPerPage
-                  ) ? 0.5 : 1 }}
+                  style={{
+                    padding: '8px 12px',
+                    opacity:
+                      currentPage ===
+                      Math.ceil(
+                        clients.filter(
+                          (client) =>
+                            client.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            client.rfc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (client.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+                        ).length / itemsPerPage
+                      )
+                        ? 0.5
+                        : 1
+                  }}
                 >
                   Siguiente ▶
                 </button>
@@ -481,5 +509,5 @@ export default function ClientsPage() {
         )}
       </div>
     </div>
-  );
+  )
 }

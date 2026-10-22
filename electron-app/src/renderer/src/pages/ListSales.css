@@ -26,7 +26,8 @@
     page-break-inside: avoid;
   }
 
-  th, td {
+  th,
+  td {
     padding: 10px;
     border: 1px solid #333;
   }
@@ -175,7 +176,8 @@ button:hover {
     font-size: 13px;
   }
 
-  table th, table td {
+  table th,
+  table td {
     padding: 8px;
   }
 

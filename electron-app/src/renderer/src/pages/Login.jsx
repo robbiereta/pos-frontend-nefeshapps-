@@ -1,29 +1,29 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { authService } from '../services/api';
-import Button from '../components/ui/Button';
-import { useToast } from '../components/ui/Toast.jsx';
-import '../styles/login.css';
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { authService } from '../services/api'
+import Button from '../components/ui/Button'
+import { useToast } from '../components/ui/Toast.jsx'
+import '../styles/login.css'
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const toast = useToast();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const toast = useToast()
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    e.preventDefault()
+    setLoading(true)
     try {
-      await authService.login(email, password);
-      toast.success('Sesión iniciada correctamente');
-      window.location.href = '/dashboard';
+      await authService.login(email, password)
+      toast.success('Sesión iniciada correctamente')
+      window.location.href = '/dashboard'
     } catch (err) {
-      toast.error(err.message || 'Credenciales inválidas');
+      toast.error(err.message || 'Credenciales inválidas')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="login-shell">
@@ -34,7 +34,10 @@ export default function Login() {
         </div>
         <div className="login-aside__copy">
           <h2>Facturación electrónica, sin fricción.</h2>
-          <p>Timbra CFDI 4.0 desde tu punto de venta, controla cajas y consulta facturas — todo en un mismo lugar.</p>
+          <p>
+            Timbra CFDI 4.0 desde tu punto de venta, controla cajas y consulta facturas — todo en un
+            mismo lugar.
+          </p>
         </div>
         <ul className="login-aside__bullets">
           <li>✓ Timbrado en segundos</li>
@@ -50,7 +53,9 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="col" style={{ gap: 16 }}>
             <div>
-              <label className="field" htmlFor="email">Correo electrónico</label>
+              <label className="field" htmlFor="email">
+                Correo electrónico
+              </label>
               <input
                 id="email"
                 type="email"
@@ -63,7 +68,9 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="field" htmlFor="password">Contraseña</label>
+              <label className="field" htmlFor="password">
+                Contraseña
+              </label>
               <input
                 id="password"
                 type="password"
@@ -86,5 +93,5 @@ export default function Login() {
         </div>
       </main>
     </div>
-  );
+  )
 }

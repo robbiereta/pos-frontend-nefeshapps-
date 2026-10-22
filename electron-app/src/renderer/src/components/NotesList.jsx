@@ -1,36 +1,36 @@
-import { useState, useEffect, useMemo } from 'react';
-import { notesService, computeAgingClient } from '../services/notesService';
-import { useToast } from './ui/Toast.jsx';
-import Button from './ui/Button.jsx';
-import NoteModal from './NoteModal.jsx';
-import PaymentModal from './PaymentModal.jsx';
-import NoteDetailModal from './NoteDetailModal.jsx';
-import AgingReport from './AgingReport.jsx';
+import { useState, useEffect, useMemo } from 'react'
+import { notesService, computeAgingClient } from '../services/notesService'
+import { useToast } from './ui/Toast.jsx'
+import Button from './ui/Button.jsx'
+import NoteModal from './NoteModal.jsx'
+import PaymentModal from './PaymentModal.jsx'
+import NoteDetailModal from './NoteDetailModal.jsx'
+import AgingReport from './AgingReport.jsx'
 
 const formatDate = (s) => {
-  if (!s) return 'N/A';
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return s;
-  return d.toLocaleDateString('es-MX');
-};
+  if (!s) return 'N/A'
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return s
+  return d.toLocaleDateString('es-MX')
+}
 
 const daysOverdue = (dueDate) => {
-  if (!dueDate) return 0;
-  const due = new Date(dueDate);
-  if (isNaN(due.getTime())) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return Math.floor((today - due) / (1000 * 60 * 60 * 24));
-};
+  if (!dueDate) return 0
+  const due = new Date(dueDate)
+  if (isNaN(due.getTime())) return 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  due.setHours(0, 0, 0, 0)
+  return Math.floor((today - due) / (1000 * 60 * 60 * 24))
+}
 
 const STATUS_OPTIONS = [
-  { value: '',          label: 'Todos' },
-  { value: 'pending',   label: 'Pendiente' },
-  { value: 'partial',   label: 'Parcial' },
-  { value: 'paid',      label: 'Pagada' },
-  { value: 'cancelled', label: 'Cancelada' },
-];
+  { value: '', label: 'Todos' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'partial', label: 'Parcial' },
+  { value: 'paid', label: 'Pagada' },
+  { value: 'cancelled', label: 'Cancelada' }
+]
 
 /**
  * Lista de notas (compartida para CxC y CxP).
@@ -40,54 +40,54 @@ const STATUS_OPTIONS = [
  *  - title: string
  */
 export default function NotesList({ type, title }) {
-  const toast = useToast();
-  const [notes, setNotes] = useState([]);
-  const [aging, setAging] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const toast = useToast()
+  const [notes, setNotes] = useState([])
+  const [aging, setAging] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   // Modales
-  const [showForm, setShowForm] = useState(false);
-  const [editingNote, setEditingNote] = useState(null);
-  const [detailNote, setDetailNote] = useState(null);
-  const [paymentNote, setPaymentNote] = useState(null);
+  const [showForm, setShowForm] = useState(false)
+  const [editingNote, setEditingNote] = useState(null)
+  const [detailNote, setDetailNote] = useState(null)
+  const [paymentNote, setPaymentNote] = useState(null)
 
-  const isReceivable = type === 'receivable';
+  const isReceivable = type === 'receivable'
 
   // Un solo useEffect para que la lista no se cargue dos veces en el
   // mount (antes había dos useEffect, uno por [type] y otro por
   // [statusFilter]; al montar type=inicial y statusFilter='' disparaban
   // los dos con la misma query).
   useEffect(() => {
-    loadNotes();
+    loadNotes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, statusFilter]);
+  }, [type, statusFilter])
 
   const loadNotes = async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
       const [notesRes, agingRes] = await Promise.all([
         notesService.getNotes({ type, status: statusFilter || undefined }),
-        notesService.getAging(type).catch(() => null),
-      ]);
-      const listRaw = notesRes.data;
-      const list = Array.isArray(listRaw) ? listRaw : [];
-      setNotes(list);
+        notesService.getAging(type).catch(() => null)
+      ])
+      const listRaw = notesRes.data
+      const list = Array.isArray(listRaw) ? listRaw : []
+      setNotes(list)
       // Si el backend no devolvió aging estructurado, calculamos
-      setAging(agingRes?.buckets ? agingRes : computeAgingClient(list));
+      setAging(agingRes?.buckets ? agingRes : computeAgingClient(list))
     } catch (err) {
-      setError(err.message || 'Error al cargar notas');
-      toast.error('Error al cargar notas');
+      setError(err.message || 'Error al cargar notas')
+      toast.error('Error al cargar notas')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   // ─── Filtro + orden + paginación client-side ───
   // El backend ordena por fechaVencimiento ASC; en UI priorizamos notas
@@ -95,79 +95,83 @@ export default function NotesList({ type, title }) {
   // cada grupo por fechaVencimiento ASC para que lo más urgente quede
   // arriba, sin importar la paginación.
   const filteredNotes = useMemo(() => {
-    const matched = !searchQuery ? notes : notes.filter(n =>
-      (n.contactName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.contactRfc || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.reference || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.concept || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (n.folio || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const matched = !searchQuery
+      ? notes
+      : notes.filter(
+          (n) =>
+            (n.contactName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (n.contactRfc || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (n.reference || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (n.concept || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (n.folio || '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
     return [...matched].sort((a, b) => {
-      const aOverdue = a.status !== 'paid' && a.status !== 'cancelled' && daysOverdue(a.dueDate) > 0;
-      const bOverdue = b.status !== 'paid' && b.status !== 'cancelled' && daysOverdue(b.dueDate) > 0;
-      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1; // vencidas primero
-      const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-      const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-      return av - bv; // fechaVencimiento ASC
-    });
-  }, [notes, searchQuery]);
+      const aOverdue = a.status !== 'paid' && a.status !== 'cancelled' && daysOverdue(a.dueDate) > 0
+      const bOverdue = b.status !== 'paid' && b.status !== 'cancelled' && daysOverdue(b.dueDate) > 0
+      if (aOverdue !== bOverdue) return aOverdue ? -1 : 1 // vencidas primero
+      const av = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
+      const bv = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
+      return av - bv // fechaVencimiento ASC
+    })
+  }, [notes, searchQuery])
 
-  const totalPages = Math.max(1, Math.ceil(filteredNotes.length / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(filteredNotes.length / itemsPerPage))
   const displayedNotes = filteredNotes.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
-  );
+  )
 
   // ─── Resumen (totales) ───
   const summary = useMemo(() => {
-    const totalAmount = notes.reduce((s, n) => s + Number(n.amount || 0), 0);
-    const totalPaid   = notes.reduce((s, n) => s + Number(n.paidAmount || 0), 0);
+    const totalAmount = notes.reduce((s, n) => s + Number(n.amount || 0), 0)
+    const totalPaid = notes.reduce((s, n) => s + Number(n.paidAmount || 0), 0)
     const totalBalance = notes.reduce(
-      (s, n) => s + Number(n.balance ?? (n.amount - (n.paidAmount || 0))), 0
-    );
-    const overdue = notes.filter(n => {
-      const bal = Number(n.balance ?? (n.amount - (n.paidAmount || 0)));
-      return bal > 0 && daysOverdue(n.dueDate) > 0;
-    }).length;
-    return { totalAmount, totalPaid, totalBalance, overdue, count: notes.length };
-  }, [notes]);
+      (s, n) => s + Number(n.balance ?? n.amount - (n.paidAmount || 0)),
+      0
+    )
+    const overdue = notes.filter((n) => {
+      const bal = Number(n.balance ?? n.amount - (n.paidAmount || 0))
+      return bal > 0 && daysOverdue(n.dueDate) > 0
+    }).length
+    return { totalAmount, totalPaid, totalBalance, overdue, count: notes.length }
+  }, [notes])
 
   // ─── Handlers CRUD ───
   const handleSave = async (data) => {
     if (editingNote) {
-      await notesService.updateNote(editingNote._id, data);
-      toast.success('Nota actualizada');
+      await notesService.updateNote(editingNote._id, data)
+      toast.success('Nota actualizada')
     } else {
-      await notesService.createNote(data);
-      toast.success('Nota creada');
+      await notesService.createNote(data)
+      toast.success('Nota creada')
     }
-    setEditingNote(null);
-    setShowForm(false);
-    await loadNotes();
-  };
+    setEditingNote(null)
+    setShowForm(false)
+    await loadNotes()
+  }
 
   const handleCancel = async (note) => {
-    if (!confirm(`¿Cancelar la nota "${note.concept}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Cancelar la nota "${note.concept}"? Esta acción no se puede deshacer.`)) return
     try {
-      await notesService.cancelNote(note._id, 'Cancelada desde POS', note.type || type);
-      toast.success('Nota cancelada');
-      await loadNotes();
+      await notesService.cancelNote(note._id, 'Cancelada desde POS', note.type || type)
+      toast.success('Nota cancelada')
+      await loadNotes()
     } catch (err) {
-      toast.error(err.message || 'Error al cancelar');
+      toast.error(err.message || 'Error al cancelar')
     }
-  };
+  }
 
   const handleAddPayment = async (paymentData) => {
-    const noteType = paymentNote.type || type;
-    await notesService.addPayment(paymentNote._id, paymentData, noteType);
-    toast.success('Abono registrado');
+    const noteType = paymentNote.type || type
+    await notesService.addPayment(paymentNote._id, paymentData, noteType)
+    toast.success('Abono registrado')
     // Refrescar detalle si está abierto
     if (detailNote && detailNote._id === paymentNote._id) {
-      const updated = await notesService.getNoteById(paymentNote._id, noteType);
-      setDetailNote(updated);
+      const updated = await notesService.getNoteById(paymentNote._id, noteType)
+      setDetailNote(updated)
     }
-    await loadNotes();
-  };
+    await loadNotes()
+  }
 
   // ─── Render ───
   return (
@@ -184,7 +188,10 @@ export default function NotesList({ type, title }) {
         <div className="row" style={{ marginTop: 12, gap: 8, flexWrap: 'wrap' }}>
           <Button
             variant="primary"
-            onClick={() => { setEditingNote(null); setShowForm(true); }}
+            onClick={() => {
+              setEditingNote(null)
+              setShowForm(true)
+            }}
           >
             Nueva Nota
           </Button>
@@ -192,7 +199,18 @@ export default function NotesList({ type, title }) {
       </div>
 
       {error && (
-        <div className="error-banner" style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '1rem', borderRadius: 8, marginBottom: '1.25rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+        <div
+          className="error-banner"
+          style={{
+            background: 'linear-gradient(to right, #fee2e2, #fecaca)',
+            color: '#991b1b',
+            padding: '1rem',
+            borderRadius: 8,
+            marginBottom: '1.25rem',
+            border: '1px solid #fca5a5',
+            fontWeight: 500
+          }}
+        >
           ⚠️ {error}
         </div>
       )}
@@ -235,18 +253,34 @@ export default function NotesList({ type, title }) {
               type="text"
               placeholder="Buscar por contacto, RFC, referencia o concepto..."
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setCurrentPage(1)
+              }}
             />
           </div>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 160 }}>
             <label>Estado</label>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
-              {STATUS_OPTIONS.map(o => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setCurrentPage(1)
+              }}
+            >
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
-          <button type="button" className="btn" onClick={loadNotes} style={{ background: 'var(--gray-200)', color: 'var(--gray-700)' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={loadNotes}
+            style={{ background: 'var(--gray-200)', color: 'var(--gray-700)' }}
+          >
             ↻ Refrescar
           </button>
         </div>
@@ -255,7 +289,9 @@ export default function NotesList({ type, title }) {
       {/* Tabla */}
       <div className="card">
         {loading && notes.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--gray-500)' }}>Cargando...</div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--gray-500)' }}>
+            Cargando...
+          </div>
         ) : filteredNotes.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--gray-500)' }}>
             No hay notas {searchQuery || statusFilter ? 'con ese filtro' : 'registradas'}
@@ -279,23 +315,35 @@ export default function NotesList({ type, title }) {
                 </thead>
                 <tbody>
                   {displayedNotes.map((n) => {
-                    const balance = Number(n.balance ?? (n.amount - (n.paidAmount || 0)));
-                    const overdue = balance > 0 && daysOverdue(n.dueDate) > 0 && n.status !== 'cancelled';
+                    const balance = Number(n.balance ?? n.amount - (n.paidAmount || 0))
+                    const overdue =
+                      balance > 0 && daysOverdue(n.dueDate) > 0 && n.status !== 'cancelled'
                     return (
                       <tr key={n._id} className={overdue ? 'overdue-row' : ''}>
-                        <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--gray-700)', whiteSpace: 'nowrap' }}>
+                        <td
+                          style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.8rem',
+                            color: 'var(--gray-700)',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
                           {n.folio || '—'}
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{n.contactName}</div>
                           {n.contactRfc && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>{n.contactRfc}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                              {n.contactRfc}
+                            </div>
                           )}
                         </td>
                         <td>
                           <div>{n.concept}</div>
                           {n.reference && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Ref: {n.reference}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>
+                              Ref: {n.reference}
+                            </div>
                           )}
                         </td>
                         <td>{formatDate(n.issueDate)}</td>
@@ -308,30 +356,46 @@ export default function NotesList({ type, title }) {
                           )}
                         </td>
                         <td className="amount-cell">${Number(n.amount || 0).toFixed(2)}</td>
-                        <td className="amount-cell" style={{ color: balance > 0 ? '#dc2626' : '#10b981' }}>
+                        <td
+                          className="amount-cell"
+                          style={{ color: balance > 0 ? '#dc2626' : '#10b981' }}
+                        >
                           ${balance.toFixed(2)}
                         </td>
                         <td>
                           <span className={`notes-badge ${n.status || 'pending'}`}>
-                            {({ pending: 'Pendiente', partial: 'Parcial', paid: isReceivable ? 'Cobrada' : 'Pagada', cancelled: 'Cancelada' })[n.status] || n.status}
+                            {{
+                              pending: 'Pendiente',
+                              partial: 'Parcial',
+                              paid: isReceivable ? 'Cobrada' : 'Pagada',
+                              cancelled: 'Cancelada'
+                            }[n.status] || n.status}
                           </span>
                         </td>
                         <td>
                           <div className="actions-cell">
                             <button
                               className="btn btn-sm"
-                              style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
+                              style={{
+                                fontSize: '0.8rem',
+                                padding: '0.4rem 0.7rem',
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '6px',
+                                transition: 'all 0.2s'
+                              }}
                               onClick={() => setDetailNote(n)}
                               title="Ver detalle"
                               onMouseEnter={(e) => {
-                                e.target.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-                                e.target.style.color = 'white';
-                                e.target.style.borderColor = '#3b82f6';
+                                e.target.style.background =
+                                  'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                e.target.style.color = 'white'
+                                e.target.style.borderColor = '#3b82f6'
                               }}
                               onMouseLeave={(e) => {
-                                e.target.style.background = 'white';
-                                e.target.style.color = '#1f2937';
-                                e.target.style.borderColor = '#e5e7eb';
+                                e.target.style.background = 'white'
+                                e.target.style.color = '#1f2937'
+                                e.target.style.borderColor = '#e5e7eb'
                               }}
                             >
                               👁
@@ -340,34 +404,54 @@ export default function NotesList({ type, title }) {
                               <>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: 'white', borderRadius: '6px', border: 'none', transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)' }}
+                                  style={{
+                                    fontSize: '0.8rem',
+                                    padding: '0.4rem 0.7rem',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: 'white',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)'
+                                  }}
                                   onClick={() => setPaymentNote(n)}
                                   title="Registrar abono"
                                   onMouseEnter={(e) => {
-                                    e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
-                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                    e.target.style.transform = 'translateY(-2px)'
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.2)';
-                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.2)'
+                                    e.target.style.transform = 'translateY(0)'
                                   }}
                                 >
                                   💵
                                 </button>
                                 <button
                                   className="btn btn-sm"
-                                  style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px', transition: 'all 0.2s' }}
-                                  onClick={() => { setEditingNote(n); setShowForm(true); }}
+                                  style={{
+                                    fontSize: '0.8rem',
+                                    padding: '0.4rem 0.7rem',
+                                    background: 'white',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '6px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onClick={() => {
+                                    setEditingNote(n)
+                                    setShowForm(true)
+                                  }}
                                   title="Editar"
                                   onMouseEnter={(e) => {
-                                    e.target.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-                                    e.target.style.color = 'white';
-                                    e.target.style.borderColor = '#f59e0b';
+                                    e.target.style.background =
+                                      'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                                    e.target.style.color = 'white'
+                                    e.target.style.borderColor = '#f59e0b'
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.target.style.background = 'white';
-                                    e.target.style.color = '#1f2937';
-                                    e.target.style.borderColor = '#e5e7eb';
+                                    e.target.style.background = 'white'
+                                    e.target.style.color = '#1f2937'
+                                    e.target.style.borderColor = '#e5e7eb'
                                   }}
                                 >
                                   ✏️
@@ -377,16 +461,24 @@ export default function NotesList({ type, title }) {
                             {n.status !== 'cancelled' && (
                               <button
                                 className="btn btn-sm"
-                                style={{ fontSize: '0.8rem', padding: '0.4rem 0.7rem', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', transition: 'all 0.2s' }}
+                                style={{
+                                  fontSize: '0.8rem',
+                                  padding: '0.4rem 0.7rem',
+                                  background: 'white',
+                                  border: '1px solid #fca5a5',
+                                  color: '#dc2626',
+                                  borderRadius: '6px',
+                                  transition: 'all 0.2s'
+                                }}
                                 onClick={() => handleCancel(n)}
                                 title="Cancelar nota"
                                 onMouseEnter={(e) => {
-                                  e.target.style.background = '#fee2e2';
-                                  e.target.style.borderColor = '#dc2626';
+                                  e.target.style.background = '#fee2e2'
+                                  e.target.style.borderColor = '#dc2626'
                                 }}
                                 onMouseLeave={(e) => {
-                                  e.target.style.background = 'white';
-                                  e.target.style.borderColor = '#fca5a5';
+                                  e.target.style.background = 'white'
+                                  e.target.style.borderColor = '#fca5a5'
                                 }}
                               >
                                 ✕
@@ -395,21 +487,54 @@ export default function NotesList({ type, title }) {
                           </div>
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
             </div>
 
             {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
-                <button className="btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>« Primera</button>
-                <button className="btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹ Anterior</button>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginTop: '1.25rem',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <button
+                  className="btn"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  « Primera
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  ‹ Anterior
+                </button>
                 <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
                   Página {currentPage} de {totalPages}
                 </span>
-                <button className="btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Siguiente ›</button>
-                <button className="btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>Última »</button>
+                <button
+                  className="btn"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente ›
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  Última »
+                </button>
               </div>
             )}
           </>
@@ -419,7 +544,10 @@ export default function NotesList({ type, title }) {
       {/* Modales */}
       <NoteModal
         open={showForm}
-        onClose={() => { setShowForm(false); setEditingNote(null); }}
+        onClose={() => {
+          setShowForm(false)
+          setEditingNote(null)
+        }}
         onSave={handleSave}
         initial={editingNote}
         type={type}
@@ -436,9 +564,11 @@ export default function NotesList({ type, title }) {
         open={!!detailNote}
         onClose={() => setDetailNote(null)}
         note={detailNote}
-        onAddPayment={() => { setPaymentNote(detailNote); }}
+        onAddPayment={() => {
+          setPaymentNote(detailNote)
+        }}
         onChanged={loadNotes}
       />
     </div>
-  );
+  )
 }

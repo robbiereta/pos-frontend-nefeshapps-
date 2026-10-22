@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { invoiceService } from '../services/api';
-import { useToast } from '../components/ui/Toast.jsx';
+import { useState } from 'react'
+import { invoiceService } from '../services/api'
+import { useToast } from '../components/ui/Toast.jsx'
 
 export default function ClientInvoice() {
   const [formData, setFormData] = useState({
@@ -12,7 +12,7 @@ export default function ClientInvoice() {
     folio: '',
     formaPago: '99',
     MetodoPago: 'PUE'
-  });
+  })
 
   const [items, setItems] = useState([
     {
@@ -23,133 +23,140 @@ export default function ClientInvoice() {
       ClaveUnidad: 'E48',
       Unidad: 'Servicio'
     }
-  ]);
+  ])
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
-  const toast = useToast();
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState(null)
+  const [error, setError] = useState(null)
+  const [result, setResult] = useState(null)
+  const toast = useToast()
 
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+      [e.target.name]: e.target.value
+    })
+  }
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
+    const newItems = [...items]
     newItems[index] = {
       ...newItems[index],
       [field]: value
-    };
-    setItems(newItems);
-  };
+    }
+    setItems(newItems)
+  }
 
   const addItem = () => {
-    setItems([...items, {
-      pu: '',
-      cantidad: '',
-      Descripcion: '',
-      CodigoSat: '81111501',
-      ClaveUnidad: 'E48',
-      Unidad: 'Servicio'
-    }]);
-  };
+    setItems([
+      ...items,
+      {
+        pu: '',
+        cantidad: '',
+        Descripcion: '',
+        CodigoSat: '81111501',
+        ClaveUnidad: 'E48',
+        Unidad: 'Servicio'
+      }
+    ])
+  }
 
   const removeItem = (index) => {
     if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+      setItems(items.filter((_, i) => i !== index))
     }
-  };
+  }
 
   const calculateTotals = () => {
-    return items.reduce((acc, item) => {
-      const pu = parseFloat(item.pu) || 0;
-      const cantidad = parseFloat(item.cantidad) || 0;
-      const subtotal = pu * cantidad;
-      acc.subtotal += subtotal;
-      acc.iva += subtotal * 0.16;
-      acc.total += subtotal * 1.16;
-      return acc;
-    }, { subtotal: 0, iva: 0, total: 0 });
-  };
+    return items.reduce(
+      (acc, item) => {
+        const pu = parseFloat(item.pu) || 0
+        const cantidad = parseFloat(item.cantidad) || 0
+        const subtotal = pu * cantidad
+        acc.subtotal += subtotal
+        acc.iva += subtotal * 0.16
+        acc.total += subtotal * 1.16
+        return acc
+      },
+      { subtotal: 0, iva: 0, total: 0 }
+    )
+  }
 
   const validateForm = () => {
     if (!formData.receptorRfc.trim()) {
-      setError('El RFC del receptor es requerido');
-      return false;
+      setError('El RFC del receptor es requerido')
+      return false
     }
     if (!formData.receptorNombre.trim()) {
-      setError('El nombre del receptor es requerido');
-      return false;
+      setError('El nombre del receptor es requerido')
+      return false
     }
     if (!formData.DomicilioFiscalReceptor.trim()) {
-      setError('El domicilio fiscal del receptor es requerido');
-      return false;
+      setError('El domicilio fiscal del receptor es requerido')
+      return false
     }
 
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+      const item = items[i]
       if (!item.pu || parseFloat(item.pu) <= 0) {
-        setError(`El precio unitario del item ${i + 1} es requerido y debe ser mayor a 0`);
-        return false;
+        setError(`El precio unitario del item ${i + 1} es requerido y debe ser mayor a 0`)
+        return false
       }
       if (!item.cantidad || parseFloat(item.cantidad) <= 0) {
-        setError(`La cantidad del item ${i + 1} es requerida y debe ser mayor a 0`);
-        return false;
+        setError(`La cantidad del item ${i + 1} es requerida y debe ser mayor a 0`)
+        return false
       }
       if (!item.Descripcion.trim()) {
-        setError(`La descripción del item ${i + 1} es requerida`);
-        return false;
+        setError(`La descripción del item ${i + 1} es requerida`)
+        return false
       }
     }
 
-    return true;
-  };
+    return true
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
 
     if (!validateForm()) {
-      return;
+      return
     }
 
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    setResult(null);
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+    setResult(null)
 
     try {
       const invoiceData = {
         ...formData,
         notasPartidas: items
-      };
+      }
 
-      const response = await invoiceService.generateClient(invoiceData);
+      const response = await invoiceService.generateClient(invoiceData)
 
-      setMessage('Factura de cliente generada y timbrada correctamente');
-      setResult(response);
-      toast.success('Factura generada y timbrada correctamente');
+      setMessage('Factura de cliente generada y timbrada correctamente')
+      setResult(response)
+      toast.success('Factura generada y timbrada correctamente')
     } catch (err) {
-      setError(err.message || 'Error al generar la factura');
-      toast.error(err.message || 'Error al generar la factura');
+      setError(err.message || 'Error al generar la factura')
+      toast.error(err.message || 'Error al generar la factura')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const totals = calculateTotals();
+  const totals = calculateTotals()
 
   return (
     <>
       <h2 style={{ marginBottom: '1.5rem' }}>Generar Factura de Cliente</h2>
-      
+
       <div className="card">
         <h2>Factura para Cliente Específico</h2>
         <p style={{ color: 'var(--gray-500)', marginBottom: '1.5rem' }}>
-          Genera una factura CFDI para un cliente específico con todos los datos requeridos por el SAT.
+          Genera una factura CFDI para un cliente específico con todos los datos requeridos por el
+          SAT.
         </p>
 
         {error && <div className="error-message">{error}</div>}
@@ -161,7 +168,14 @@ export default function ClientInvoice() {
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
               Datos del Receptor
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 2fr',
+                gap: '1rem',
+                marginBottom: '1rem'
+              }}
+            >
               <div className="form-group">
                 <label htmlFor="receptorRfc">RFC del Receptor *</label>
                 <input
@@ -188,7 +202,7 @@ export default function ClientInvoice() {
                 />
               </div>
             </div>
-            
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label htmlFor="receptorRegimen">Régimen Fiscal</label>
@@ -201,24 +215,36 @@ export default function ClientInvoice() {
                   <option value="616">616 - Sin obligaciones fiscales</option>
                   <option value="601">601 - General de Ley Personas Morales</option>
                   <option value="603">603 - Personas Morales con fines no lucrativos</option>
-                  <option value="605">605 - Sueldos y salarios e ingresos asimilados a salarios</option>
-                  <option value="606">606 - Régimen de actividades agrícolas, ganaderas, silvícolas y pesqueras</option>
-                  <option value="607">607 - Régimen de actividades empresariales y profesionales</option>
+                  <option value="605">
+                    605 - Sueldos y salarios e ingresos asimilados a salarios
+                  </option>
+                  <option value="606">
+                    606 - Régimen de actividades agrícolas, ganaderas, silvícolas y pesqueras
+                  </option>
+                  <option value="607">
+                    607 - Régimen de actividades empresariales y profesionales
+                  </option>
                   <option value="608">608 - Régimen de incorporación fiscal</option>
-                  <option value="610">610 - Régimen de los ingresos enajenación de casa habitación</option>
+                  <option value="610">
+                    610 - Régimen de los ingresos enajenación de casa habitación
+                  </option>
                   <option value="611">611 - Régimen de los ingresos por sueldos y salarios</option>
                   <option value="612">612 - Personas físicas con ingresos de otros países</option>
                   <option value="614">614 - Régimen de los ingresos por intereses</option>
                   <option value="615">615 - Régimen de los ingresos por dividendos</option>
                   <option value="621">621 - Sociedades cooperativas de producción</option>
-                  <option value="622">622 - Actividades agrícolas, ganaderas, silvícolas y pesqueras</option>
+                  <option value="622">
+                    622 - Actividades agrícolas, ganaderas, silvícolas y pesqueras
+                  </option>
                   <option value="623">623 - Opcional para grupos de sociedades</option>
                   <option value="624">624 - Coordinados</option>
-                  <option value="625">625 - Régimen de actividades empresariales con ingresos a través de plataformas</option>
+                  <option value="625">
+                    625 - Régimen de actividades empresariales con ingresos a través de plataformas
+                  </option>
                   <option value="626">626 - Régimen simplificado de confianza</option>
                 </select>
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="DomicilioFiscalReceptor">Código Postal Fiscal *</label>
                 <input
@@ -231,7 +257,7 @@ export default function ClientInvoice() {
                   required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="UsoCFDI">Uso del CFDI</label>
                 <select
@@ -247,19 +273,28 @@ export default function ClientInvoice() {
                   <option value="I02">I02 - Mobiliario y equipo de oficina</option>
                   <option value="I03">I03 - Equipo de transporte</option>
                   <option value="I04">I04 - Equipo de cómputo y accesorios</option>
-                  <option value="I05">I05 - Dados, troqueles, moldes, matrices y herramental</option>
+                  <option value="I05">
+                    I05 - Dados, troqueles, moldes, matrices y herramental
+                  </option>
                   <option value="I06">I06 - Comunicaciones telefónicas</option>
                   <option value="I07">I07 - Comunicaciones satelitales</option>
                   <option value="I08">I08 - Otra maquinaria y equipo</option>
-                  <option value="D01">D01 - Honorarios médicos, dentales y gastos hospitalarios</option>
+                  <option value="D01">
+                    D01 - Honorarios médicos, dentales y gastos hospitalarios
+                  </option>
                   <option value="D02">D02 - Gastos médicos por incapacidad o discapacidad</option>
                   <option value="D03">D03 - Gastos funerales</option>
                   <option value="D04">D04 - Donativos</option>
-                  <option value="D05">D05 - Intereses reales efectivamente pagados por créditos hipotecarios</option>
+                  <option value="D05">
+                    D05 - Intereses reales efectivamente pagados por créditos hipotecarios
+                  </option>
                   <option value="D06">D06 - Aportaciones voluntarias al SAR</option>
                   <option value="D07">D07 - Primas por seguros de gastos médicos</option>
                   <option value="D08">D08 - Gastos de transportación escolar obligatoria</option>
-                  <option value="D09">D09 - Depósitos en cuentas para el ahorro, primas que tengan como base planes de pensiones</option>
+                  <option value="D09">
+                    D09 - Depósitos en cuentas para el ahorro, primas que tengan como base planes de
+                    pensiones
+                  </option>
                   <option value="D10">D10 - Pagos por servicios educativos</option>
                   <option value="P01">P01 - Por definir</option>
                 </select>
@@ -272,16 +307,26 @@ export default function ClientInvoice() {
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
               Conceptos de la Factura
             </h3>
-            
+
             {items.map((item, index) => (
-              <div key={index} style={{ 
-                border: '1px solid var(--gray-200)', 
-                borderRadius: '4px', 
-                padding: '1rem', 
-                marginBottom: '1rem',
-                backgroundColor: 'var(--gray-50)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div
+                key={index}
+                style={{
+                  border: '1px solid var(--gray-200)',
+                  borderRadius: '4px',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                  backgroundColor: 'var(--gray-50)'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '1rem'
+                  }}
+                >
                   <h4 style={{ margin: 0, fontSize: '0.9rem' }}>Item {index + 1}</h4>
                   {items.length > 1 && (
                     <button
@@ -301,8 +346,15 @@ export default function ClientInvoice() {
                     </button>
                   )}
                 </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                    gap: '0.5rem',
+                    marginBottom: '0.5rem'
+                  }}
+                >
                   <div className="form-group">
                     <label>Descripción *</label>
                     <input
@@ -345,7 +397,7 @@ export default function ClientInvoice() {
                     />
                   </div>
                 </div>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                   <div className="form-group">
                     <label>Clave SAT</label>
@@ -355,16 +407,24 @@ export default function ClientInvoice() {
                     >
                       <optgroup label="Servicios Profesionales">
                         <option value="81111501">81111501 - Consultoría en administración</option>
-                        <option value="81111502">81111502 - Consultoría en administración de proyectos</option>
+                        <option value="81111502">
+                          81111502 - Consultoría en administración de proyectos
+                        </option>
                         <option value="81111503">81111503 - Consultoría en ingeniería</option>
                         <option value="81111504">81111504 - Consultoría en recursos humanos</option>
                         <option value="81111505">81111505 - Consultoría en finanzas</option>
                         <option value="81111506">81111506 - Consultoría en mercadotecnia</option>
-                        <option value="81111507">81111507 - Consultoría en sistemas informáticos</option>
-                        <option value="81111508">81111508 - Consultoría en procesos de negocio</option>
+                        <option value="81111507">
+                          81111507 - Consultoría en sistemas informáticos
+                        </option>
+                        <option value="81111508">
+                          81111508 - Consultoría en procesos de negocio
+                        </option>
                         <option value="81111509">81111509 - Consultoría en calidad</option>
                         <option value="81111510">81111510 - Consultoría en logística</option>
-                        <option value="81121501">81121501 - Desarrollo de software a la medida</option>
+                        <option value="81121501">
+                          81121501 - Desarrollo de software a la medida
+                        </option>
                         <option value="81121502">81121502 - Mantenimiento de software</option>
                         <option value="81121503">81121503 - Soporte técnico de software</option>
                         <option value="81121504">81121504 - Análisis y diseño de sistemas</option>
@@ -374,8 +434,12 @@ export default function ClientInvoice() {
                         <option value="81121508">81121508 - Implementación de software</option>
                         <option value="81121601">81121601 - Servicios de diseño gráfico</option>
                         <option value="81121602">81121602 - Servicios de diseño industrial</option>
-                        <option value="81121603">81121603 - Servicios de diseño de interiores</option>
-                        <option value="81121604">81121604 - Servicios de diseño arquitectónico</option>
+                        <option value="81121603">
+                          81121603 - Servicios de diseño de interiores
+                        </option>
+                        <option value="81121604">
+                          81121604 - Servicios de diseño arquitectónico
+                        </option>
                         <option value="81121605">81121605 - Servicios de diseño web</option>
                         <option value="81121606">81121606 - Servicios de diseño de moda</option>
                         <option value="81121701">81121701 - Servicios legales</option>
@@ -390,75 +454,149 @@ export default function ClientInvoice() {
                         <option value="50111503">50111503 - Servicios de desmontaje</option>
                         <option value="50111504">50111504 - Servicios de cableado</option>
                         <option value="50111505">50111505 - Servicios de conexión</option>
-                        <option value="50202300">50202300 - Mantenimiento y reparación de maquinaria</option>
-                        <option value="50202301">50202301 - Mantenimiento de equipo de cómputo</option>
-                        <option value="50202302">50202302 - Mantenimiento de equipo de oficina</option>
-                        <option value="50202303">50202303 - Mantenimiento de equipo industrial</option>
+                        <option value="50202300">
+                          50202300 - Mantenimiento y reparación de maquinaria
+                        </option>
+                        <option value="50202301">
+                          50202301 - Mantenimiento de equipo de cómputo
+                        </option>
+                        <option value="50202302">
+                          50202302 - Mantenimiento de equipo de oficina
+                        </option>
+                        <option value="50202303">
+                          50202303 - Mantenimiento de equipo industrial
+                        </option>
                         <option value="50202304">50202304 - Mantenimiento de vehículos</option>
                         <option value="50202305">50202305 - Mantenimiento de equipo médico</option>
                         <option value="50211501">50211501 - Reparación de equipo de cómputo</option>
                         <option value="50211502">50211502 - Reparación de equipo de oficina</option>
-                        <option value="50211503">50211503 - Reparación de equipo de comunicación</option>
-                        <option value="50211504">50211504 - Reparación de equipo electrónico</option>
+                        <option value="50211503">
+                          50211503 - Reparación de equipo de comunicación
+                        </option>
+                        <option value="50211504">
+                          50211504 - Reparación de equipo electrónico
+                        </option>
                         <option value="50211505">50211505 - Reparación de equipo médico</option>
                       </optgroup>
                       <optgroup label="Servicios Educativos y Capacitación">
                         <option value="84111500">84111500 - Servicios educativos</option>
                         <option value="84111501">84111501 - Servicios de capacitación</option>
                         <option value="84111502">84111502 - Servicios de adiestramiento</option>
-                        <option value="84111503">84111503 - Servicios de formación profesional</option>
+                        <option value="84111503">
+                          84111503 - Servicios de formación profesional
+                        </option>
                         <option value="84111504">84111504 - Servicios de educación continua</option>
-                        <option value="84111505">84111505 - Servicios de educación a distancia</option>
+                        <option value="84111505">
+                          84111505 - Servicios de educación a distancia
+                        </option>
                         <option value="84111506">84111506 - Servicios de educación en línea</option>
-                        <option value="84111507">84111507 - Servicios de educación corporativa</option>
+                        <option value="84111507">
+                          84111507 - Servicios de educación corporativa
+                        </option>
                         <option value="84111508">84111508 - Servicios de educación técnica</option>
                         <option value="84111509">84111509 - Servicios de educación superior</option>
                       </optgroup>
                       <optgroup label="Servicios de Información y Comunicación">
-                        <option value="84121201">84121201 - Servicios de procesamiento de datos</option>
-                        <option value="84121202">84121202 - Servicios de hospedaje de información</option>
-                        <option value="84121203">84121203 - Servicios de almacenamiento de datos</option>
-                        <option value="84121204">84121204 - Servicios de respaldo de información</option>
-                        <option value="84121205">84121205 - Servicios de recuperación de datos</option>
+                        <option value="84121201">
+                          84121201 - Servicios de procesamiento de datos
+                        </option>
+                        <option value="84121202">
+                          84121202 - Servicios de hospedaje de información
+                        </option>
+                        <option value="84121203">
+                          84121203 - Servicios de almacenamiento de datos
+                        </option>
+                        <option value="84121204">
+                          84121204 - Servicios de respaldo de información
+                        </option>
+                        <option value="84121205">
+                          84121205 - Servicios de recuperación de datos
+                        </option>
                         <option value="84121206">84121206 - Servicios de nube (cloud)</option>
-                        <option value="84121207">84121207 - Servicios de infraestructura como servicio</option>
-                        <option value="84121208">84121208 - Servicios de plataforma como servicio</option>
-                        <option value="84121209">84121209 - Servicios de software como servicio</option>
+                        <option value="84121207">
+                          84121207 - Servicios de infraestructura como servicio
+                        </option>
+                        <option value="84121208">
+                          84121208 - Servicios de plataforma como servicio
+                        </option>
+                        <option value="84121209">
+                          84121209 - Servicios de software como servicio
+                        </option>
                         <option value="84121210">84121210 - Servicios de bases de datos</option>
-                        <option value="84121211">84121211 - Servicios de seguridad informática</option>
-                        <option value="84121212">84121212 - Servicios de monitoreo de sistemas</option>
-                        <option value="84121213">84121213 - Servicios de administración de redes</option>
-                        <option value="84121214">84121214 - Servicios de administración de servidores</option>
-                        <option value="84121215">84121215 - Servicios de administración de sistemas</option>
+                        <option value="84121211">
+                          84121211 - Servicios de seguridad informática
+                        </option>
+                        <option value="84121212">
+                          84121212 - Servicios de monitoreo de sistemas
+                        </option>
+                        <option value="84121213">
+                          84121213 - Servicios de administración de redes
+                        </option>
+                        <option value="84121214">
+                          84121214 - Servicios de administración de servidores
+                        </option>
+                        <option value="84121215">
+                          84121215 - Servicios de administración de sistemas
+                        </option>
                       </optgroup>
                       <optgroup label="Servicios de Marketing y Publicidad">
                         <option value="84131600">84131600 - Servicios de publicidad</option>
                         <option value="84131601">84131601 - Servicios de marketing digital</option>
-                        <option value="84131602">84131602 - Servicios de marketing en redes sociales</option>
-                        <option value="84131603">84131603 - Servicios de marketing por correo electrónico</option>
-                        <option value="84131604">84131604 - Servicios de marketing de contenidos</option>
-                        <option value="84131605">84131605 - Servicios de marketing de búsqueda</option>
-                        <option value="84131606">84131606 - Servicios de marketing de afiliados</option>
-                        <option value="84131607">84131607 - Servicios de marketing de influencia</option>
-                        <option value="84131608">84131608 - Servicios de marketing de eventos</option>
+                        <option value="84131602">
+                          84131602 - Servicios de marketing en redes sociales
+                        </option>
+                        <option value="84131603">
+                          84131603 - Servicios de marketing por correo electrónico
+                        </option>
+                        <option value="84131604">
+                          84131604 - Servicios de marketing de contenidos
+                        </option>
+                        <option value="84131605">
+                          84131605 - Servicios de marketing de búsqueda
+                        </option>
+                        <option value="84131606">
+                          84131606 - Servicios de marketing de afiliados
+                        </option>
+                        <option value="84131607">
+                          84131607 - Servicios de marketing de influencia
+                        </option>
+                        <option value="84131608">
+                          84131608 - Servicios de marketing de eventos
+                        </option>
                         <option value="84131609">84131609 - Servicios de marketing de marca</option>
-                        <option value="84131610">84131610 - Servicios de marketing de producto</option>
+                        <option value="84131610">
+                          84131610 - Servicios de marketing de producto
+                        </option>
                       </optgroup>
                       <optgroup label="Arrendamiento y Alquiler">
                         <option value="71101100">71101100 - Arrendamiento de inmuebles</option>
                         <option value="71101101">71101101 - Arrendamiento de oficinas</option>
                         <option value="71101102">71101102 - Arrendamiento de bodegas</option>
-                        <option value="71101103">71101103 - Arrendamiento de locales comerciales</option>
+                        <option value="71101103">
+                          71101103 - Arrendamiento de locales comerciales
+                        </option>
                         <option value="71101104">71101104 - Arrendamiento de terrenos</option>
-                        <option value="71101105">71101105 - Arrendamiento de estacionamientos</option>
+                        <option value="71101105">
+                          71101105 - Arrendamiento de estacionamientos
+                        </option>
                         <option value="71101200">71101200 - Arrendamiento de maquinaria</option>
-                        <option value="71101201">71101201 - Arrendamiento de equipo de cómputo</option>
-                        <option value="71101202">71101202 - Arrendamiento de equipo de oficina</option>
-                        <option value="71101203">71101203 - Arrendamiento de equipo industrial</option>
+                        <option value="71101201">
+                          71101201 - Arrendamiento de equipo de cómputo
+                        </option>
+                        <option value="71101202">
+                          71101202 - Arrendamiento de equipo de oficina
+                        </option>
+                        <option value="71101203">
+                          71101203 - Arrendamiento de equipo industrial
+                        </option>
                         <option value="71101204">71101204 - Arrendamiento de vehículos</option>
                         <option value="71101205">71101205 - Arrendamiento de equipo médico</option>
-                        <option value="71101206">71101206 - Arrendamiento de equipo de construcción</option>
-                        <option value="71101207">71101207 - Arrendamiento de equipo de comunicación</option>
+                        <option value="71101206">
+                          71101206 - Arrendamiento de equipo de construcción
+                        </option>
+                        <option value="71101207">
+                          71101207 - Arrendamiento de equipo de comunicación
+                        </option>
                       </optgroup>
                       <optgroup label="Productos y Otros">
                         <option value="10101500">10101500 - Equipo de cómputo</option>
@@ -485,9 +623,15 @@ export default function ClientInvoice() {
                         <option value="50101605">50101605 - Suministro de telefonía</option>
                         <option value="50101606">50101606 - Suministro de televisión</option>
                         <option value="50101607">50101607 - Suministro de radio</option>
-                        <option value="50101608">50101608 - Suministro de servicios de mensajería</option>
-                        <option value="50101609">50101609 - Suministro de servicios de paquetería</option>
-                        <option value="50101610">50101610 - Suministro de servicios de transporte</option>
+                        <option value="50101608">
+                          50101608 - Suministro de servicios de mensajería
+                        </option>
+                        <option value="50101609">
+                          50101609 - Suministro de servicios de paquetería
+                        </option>
+                        <option value="50101610">
+                          50101610 - Suministro de servicios de transporte
+                        </option>
                       </optgroup>
                     </select>
                   </div>
@@ -1110,7 +1254,7 @@ export default function ClientInvoice() {
                 </div>
               </div>
             ))}
-            
+
             <button
               type="button"
               onClick={addItem}
@@ -1193,13 +1337,15 @@ export default function ClientInvoice() {
           </div>
 
           {/* Resumen */}
-          <div style={{ 
-            border: '1px solid var(--gray-200)', 
-            borderRadius: '4px', 
-            padding: '1rem', 
-            marginBottom: '2rem',
-            backgroundColor: 'var(--gray-50)'
-          }}>
+          <div
+            style={{
+              border: '1px solid var(--gray-200)',
+              borderRadius: '4px',
+              padding: '1rem',
+              marginBottom: '2rem',
+              backgroundColor: 'var(--gray-50)'
+            }}
+          >
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Resumen de Totales</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
               <div>
@@ -1216,7 +1362,9 @@ export default function ClientInvoice() {
               </div>
               <div>
                 <span style={{ color: 'var(--gray-600)' }}>Total:</span>
-                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                <div
+                  style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}
+                >
                   ${totals.total.toFixed(2)}
                 </div>
               </div>
@@ -1229,28 +1377,70 @@ export default function ClientInvoice() {
         </form>
 
         {result && (
-          <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--gray-50)', borderRadius: '4px' }}>
-            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>Factura Generada Exitosamente</h3>
+          <div
+            style={{
+              marginTop: '1.5rem',
+              padding: '1rem',
+              background: 'var(--gray-50)',
+              borderRadius: '4px'
+            }}
+          >
+            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+              Factura Generada Exitosamente
+            </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <p><strong>UUID:</strong> {result.uuid || result.stampData?.uuid || result._id || 'N/A'}</p>
-              <p><strong>Folio:</strong> {result.invoice?.Folio || 'N/A'}</p>
-              <p><strong>Estado:</strong> {result.stampData?.status || 'Generado'}</p>
-              <p><strong>Fecha:</strong> {result.invoice?.Fecha || new Date().toLocaleString('es-MX')}</p>
-              <p><strong>Total:</strong> ${parseFloat(result.invoice?.Total || 0).toFixed(2)}</p>
-              <p><strong>Cliente:</strong> {result.invoice?.Receptor?.Nombre || 'N/A'}</p>
+              <p>
+                <strong>UUID:</strong>{' '}
+                {result.uuid || result.stampData?.uuid || result._id || 'N/A'}
+              </p>
+              <p>
+                <strong>Folio:</strong> {result.invoice?.Folio || 'N/A'}
+              </p>
+              <p>
+                <strong>Estado:</strong> {result.stampData?.status || 'Generado'}
+              </p>
+              <p>
+                <strong>Fecha:</strong>{' '}
+                {result.invoice?.Fecha || new Date().toLocaleString('es-MX')}
+              </p>
+              <p>
+                <strong>Total:</strong> ${parseFloat(result.invoice?.Total || 0).toFixed(2)}
+              </p>
+              <p>
+                <strong>Cliente:</strong> {result.invoice?.Receptor?.Nombre || 'N/A'}
+              </p>
             </div>
-            
-            <div style={{ marginTop: '2rem', borderTop: '2px solid var(--gray-300)', paddingTop: '1rem' }}>
+
+            <div
+              style={{
+                marginTop: '2rem',
+                borderTop: '2px solid var(--gray-300)',
+                paddingTop: '1rem'
+              }}
+            >
               <h3 style={{ marginBottom: '1rem' }}>Detalles de la Factura</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '1rem',
+                  marginBottom: '1.5rem'
+                }}
+              >
                 <div>
                   <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>Subtotal</p>
-                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>${parseFloat(result.invoice?.SubTotal || 0).toFixed(2)}</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>
+                    ${parseFloat(result.invoice?.SubTotal || 0).toFixed(2)}
+                  </p>
                 </div>
                 <div>
                   <p style={{ color: 'var(--gray-600)', fontSize: '0.9rem' }}>IVA (16%)</p>
                   <p style={{ fontSize: '1.1rem', fontWeight: '600' }}>
-                    ${(parseFloat(result.invoice?.Total || 0) - parseFloat(result.invoice?.SubTotal || 0)).toFixed(2)}
+                    $
+                    {(
+                      parseFloat(result.invoice?.Total || 0) -
+                      parseFloat(result.invoice?.SubTotal || 0)
+                    ).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -1262,9 +1452,9 @@ export default function ClientInvoice() {
                 <textarea
                   readOnly
                   value={result.xml}
-                  style={{ 
-                    width: '100%', 
-                    height: '100px', 
+                  style={{
+                    width: '100%',
+                    height: '100px',
                     fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     backgroundColor: 'white',
@@ -1277,5 +1467,5 @@ export default function ClientInvoice() {
         )}
       </div>
     </>
-  );
+  )
 }

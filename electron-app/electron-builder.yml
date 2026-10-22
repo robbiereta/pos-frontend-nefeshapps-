@@ -10,6 +10,20 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+extraResources:
+  - from: src/main/nefapi-cfdis
+    to: nefapi-cfdis
+    filter:
+      - '**/*'
+      - '!**/.env'
+      - '!**/.env.*'
+      - '!**/.git/**'
+      - '!**/tests/**'
+      - '!**/uploads/**'
+      - '!**/storage/**'
+      - '!**/*.md'
+      - '!**/*.xlsx'
+      - '!**/test-*.js'
 win:
   executableName: electron-app
 nsis:

@@ -9,8 +9,9 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 0.25rem 0.25rem 0.25rem 0.875rem;
-  transition: border-color var(--duration-fast) var(--ease-standard),
-              box-shadow var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 .barcode-search__field:focus-within {
   border-color: var(--brand-500);
@@ -42,7 +43,9 @@
   padding: 0.5rem 0.25rem;
   min-width: 0;
 }
-.barcode-search__input::placeholder { color: var(--neutral-400); }
+.barcode-search__input::placeholder {
+  color: var(--neutral-400);
+}
 
 .barcode-search__btn {
   background: var(--brand-600);
@@ -56,8 +59,13 @@
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard);
 }
-.barcode-search__btn:hover:not(:disabled) { background: var(--brand-700); }
-.barcode-search__btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.barcode-search__btn:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+.barcode-search__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
 .barcode-search__msg {
   margin-top: 0.5rem;

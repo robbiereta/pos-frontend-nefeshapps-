@@ -3,7 +3,7 @@ services:
     image: nefeshapps-pos-frontend:latest
     container_name: nefeshapps-pos-frontend
     ports:
-      - "127.0.0.1:3002:3002"
+      - '127.0.0.1:3002:3002'
     restart: unless-stopped
     environment:
       - NODE_ENV=production

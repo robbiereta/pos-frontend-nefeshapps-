@@ -64,8 +64,14 @@
   border-radius: 10px;
   padding: 14px;
 }
-.import-result.ok { border-color: #b8e0c2; background: #f3fbf5; }
-.import-result.has-errors { border-color: #f1c4c0; background: #fdf3f1; }
+.import-result.ok {
+  border-color: #b8e0c2;
+  background: #f3fbf5;
+}
+.import-result.has-errors {
+  border-color: #f1c4c0;
+  background: #fdf3f1;
+}
 .import-result h3 {
   margin: 0 0 8px;
   font-size: 15px;
@@ -98,4 +104,6 @@
   padding: 8px 12px;
   margin: 8px 0 0;
 }
-.import-errors li { padding: 2px 0; }
+.import-errors li {
+  padding: 2px 0;
+}

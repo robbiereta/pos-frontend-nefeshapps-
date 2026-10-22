@@ -23,7 +23,7 @@ services:
     image: nefeshapps-pos-frontend:staging
     container_name: nefeshapps-pos-frontend-staging
     ports:
-      - "127.0.0.1:3004:3002"
+      - '127.0.0.1:3004:3002'
     restart: unless-stopped
     environment:
       - NODE_ENV=staging

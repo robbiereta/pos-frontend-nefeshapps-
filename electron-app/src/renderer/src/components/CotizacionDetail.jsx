@@ -1,55 +1,65 @@
-import { useState } from 'react';
-import { cotizacionService } from '../services/cotizacionService';
-import { useToast } from './ui/Toast.jsx';
-import './Modal.css';
+import { useState } from 'react'
+import { cotizacionService } from '../services/cotizacionService'
+import { useToast } from './ui/Toast.jsx'
+import './Modal.css'
 
-const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-MX', { dateStyle: 'long' }) : '—';
+const fmt = (n) =>
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0)
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('es-MX', { dateStyle: 'long' }) : '—')
 
 const ESTADO = {
-  borrador:  { label: 'Borrador',  cls: 'badge-secondary' },
-  enviada:   { label: 'Enviada',   cls: 'badge-info' },
-  aceptada:  { label: 'Aceptada',  cls: 'badge-success' },
+  borrador: { label: 'Borrador', cls: 'badge-secondary' },
+  enviada: { label: 'Enviada', cls: 'badge-info' },
+  aceptada: { label: 'Aceptada', cls: 'badge-success' },
   rechazada: { label: 'Rechazada', cls: 'badge-danger' },
-  vencida:   { label: 'Vencida',   cls: 'badge-warning' },
-  facturada: { label: 'Facturada', cls: 'badge-primary' },
-};
+  vencida: { label: 'Vencida', cls: 'badge-warning' },
+  facturada: { label: 'Facturada', cls: 'badge-primary' }
+}
 
 export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
-  const [busy, setBusy] = useState(false);
-  const toast = useToast();
-  const badge = ESTADO[cotizacion.estado] || { label: cotizacion.estado, cls: 'badge-secondary' };
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+  const badge = ESTADO[cotizacion.estado] || { label: cotizacion.estado, cls: 'badge-secondary' }
 
   const can = {
-    enviar:    cotizacion.estado === 'borrador',
-    aceptar:   cotizacion.estado === 'enviada',
-    rechazar:  cotizacion.estado === 'enviada' || cotizacion.estado === 'borrador',
-    convertir: cotizacion.estado === 'aceptada',
-  };
+    enviar: cotizacion.estado === 'borrador',
+    aceptar: cotizacion.estado === 'enviada',
+    rechazar: cotizacion.estado === 'enviada' || cotizacion.estado === 'borrador',
+    convertir: cotizacion.estado === 'aceptada'
+  }
 
   const run = async (fn, label) => {
-    setBusy(true);
+    setBusy(true)
     try {
-      await onAction(fn, cotizacion._id);
+      await onAction(fn, cotizacion._id)
     } catch (e) {
-      toast?.error?.(e.message);
+      toast?.error?.(e.message)
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
-  };
+  }
 
   const handleEnviar = async () => {
-    const email = window.prompt('Email destino (Enter para usar el del cliente):', cotizacion.clienteSnapshot?.email || '');
-    if (email === null) return; // cancelado
-    run((id) => cotizacionService.enviar(id, { email: email || undefined }), 'enviar');
-  };
+    const email = window.prompt(
+      'Email destino (Enter para usar el del cliente):',
+      cotizacion.clienteSnapshot?.email || ''
+    )
+    if (email === null) return // cancelado
+    run((id) => cotizacionService.enviar(id, { email: email || undefined }), 'enviar')
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 760, width: '100%' }}>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: 760, width: '100%' }}
+      >
         <div className="modal-header">
           <h2>📋 {cotizacion.folio}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
@@ -77,10 +87,30 @@ export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
               <h3>Cliente</h3>
               <p>
                 <strong>{cotizacion.clienteSnapshot.nombre}</strong>
-                {cotizacion.clienteSnapshot.rfc && <><br />RFC: {cotizacion.clienteSnapshot.rfc}</>}
-                {cotizacion.clienteSnapshot.email && <><br />📧 {cotizacion.clienteSnapshot.email}</>}
-                {cotizacion.clienteSnapshot.telefono && <><br />📞 {cotizacion.clienteSnapshot.telefono}</>}
-                {cotizacion.clienteSnapshot.direccion && <><br />📍 {cotizacion.clienteSnapshot.direccion}</>}
+                {cotizacion.clienteSnapshot.rfc && (
+                  <>
+                    <br />
+                    RFC: {cotizacion.clienteSnapshot.rfc}
+                  </>
+                )}
+                {cotizacion.clienteSnapshot.email && (
+                  <>
+                    <br />
+                    📧 {cotizacion.clienteSnapshot.email}
+                  </>
+                )}
+                {cotizacion.clienteSnapshot.telefono && (
+                  <>
+                    <br />
+                    📞 {cotizacion.clienteSnapshot.telefono}
+                  </>
+                )}
+                {cotizacion.clienteSnapshot.direccion && (
+                  <>
+                    <br />
+                    📍 {cotizacion.clienteSnapshot.direccion}
+                  </>
+                )}
               </p>
             </section>
           )}
@@ -103,7 +133,12 @@ export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
                   <tr key={i}>
                     <td>
                       {it.descripcion}
-                      {it.sku && <><br /><small className="muted">{it.sku}</small></>}
+                      {it.sku && (
+                        <>
+                          <br />
+                          <small className="muted">{it.sku}</small>
+                        </>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>{it.cantidad}</td>
                     <td style={{ textAlign: 'right' }}>{fmt(it.precioUnitario)}</td>
@@ -117,10 +152,24 @@ export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
           </section>
 
           <div className="detail-totals">
-            <div><span>Subtotal</span><strong>{fmt(cotizacion.subtotal)}</strong></div>
-            {cotizacion.descuento ? <div><span>Descuento</span><strong>− {fmt(cotizacion.descuento)}</strong></div> : null}
-            <div><span>IVA</span><strong>{fmt(cotizacion.iva)}</strong></div>
-            <div className="total-final"><span>Total</span><strong>{fmt(cotizacion.total)}</strong></div>
+            <div>
+              <span>Subtotal</span>
+              <strong>{fmt(cotizacion.subtotal)}</strong>
+            </div>
+            {cotizacion.descuento ? (
+              <div>
+                <span>Descuento</span>
+                <strong>− {fmt(cotizacion.descuento)}</strong>
+              </div>
+            ) : null}
+            <div>
+              <span>IVA</span>
+              <strong>{fmt(cotizacion.iva)}</strong>
+            </div>
+            <div className="total-final">
+              <span>Total</span>
+              <strong>{fmt(cotizacion.total)}</strong>
+            </div>
           </div>
 
           {cotizacion.condiciones && (
@@ -158,7 +207,11 @@ export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
             📄 PDF
           </a>
           {can.rechazar && (
-            <button className="btn btn-danger" disabled={busy} onClick={() => run(cotizacionService.rechazar, 'rechazar')}>
+            <button
+              className="btn btn-danger"
+              disabled={busy}
+              onClick={() => run(cotizacionService.rechazar, 'rechazar')}
+            >
               Rechazar
             </button>
           )}
@@ -168,18 +221,28 @@ export default function CotizacionDetail({ cotizacion, onClose, onAction }) {
             </button>
           )}
           {can.aceptar && (
-            <button className="btn btn-success" disabled={busy} onClick={() => run(cotizacionService.aceptar, 'aceptar')}>
+            <button
+              className="btn btn-success"
+              disabled={busy}
+              onClick={() => run(cotizacionService.aceptar, 'aceptar')}
+            >
               ✓ Aceptar
             </button>
           )}
           {can.convertir && (
-            <button className="btn btn-primary" disabled={busy} onClick={() => run(cotizacionService.convertir, 'convertir')}>
+            <button
+              className="btn btn-primary"
+              disabled={busy}
+              onClick={() => run(cotizacionService.convertir, 'convertir')}
+            >
               💼 Convertir a factura
             </button>
           )}
-          <button className="btn btn-secondary" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cerrar
+          </button>
         </div>
       </div>
     </div>
-  );
+  )
 }

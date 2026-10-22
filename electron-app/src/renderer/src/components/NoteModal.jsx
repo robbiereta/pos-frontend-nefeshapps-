@@ -1,12 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { clientService } from '../services/api';
+import { useState, useEffect, useMemo } from 'react'
+import { clientService } from '../services/api'
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+const todayISO = () => new Date().toISOString().split('T')[0]
 const addDays = (iso, days) => {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-};
+  const d = new Date(iso)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
 
 const emptyForm = () => ({
   clienteId: '',
@@ -17,8 +17,8 @@ const emptyForm = () => ({
   amount: '',
   issueDate: todayISO(),
   dueDate: addDays(todayISO(), 30),
-  notes: '',
-});
+  notes: ''
+})
 
 /**
  * Modal para crear / editar una nota (por cobrar o por pagar).
@@ -31,12 +31,12 @@ const emptyForm = () => ({
  *  - type: 'receivable' | 'payable'
  */
 export default function NoteModal({ open, onClose, onSave, initial, type }) {
-  const [form, setForm] = useState(emptyForm());
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [clients, setClients] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
+  const [form, setForm] = useState(emptyForm())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [clients, setClients] = useState([])
+  const [loadingClients, setLoadingClients] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -50,34 +50,36 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
           amount: initial.amount ?? '',
           issueDate: initial.issueDate?.split('T')[0] || todayISO(),
           dueDate: initial.dueDate?.split('T')[0] || addDays(todayISO(), 30),
-          notes: initial.notes || '',
-        });
+          notes: initial.notes || ''
+        })
       } else {
-        setForm(emptyForm());
+        setForm(emptyForm())
       }
-      setError(null);
-      setClientSearch('');
+      setError(null)
+      setClientSearch('')
     }
-  }, [open, initial]);
+  }, [open, initial])
 
   // Cargar clientes al abrir (solo para CxC; las CxP no usan esta lógica)
   useEffect(() => {
-    if (!open || type !== 'receivable') return;
-    let cancelled = false;
-    (async () => {
-      setLoadingClients(true);
+    if (!open || type !== 'receivable') return
+    let cancelled = false
+    ;(async () => {
+      setLoadingClients(true)
       try {
-        const res = await clientService.getAllClients({ limit: 500, page: 1 });
-        if (!cancelled) setClients(res.data || []);
+        const res = await clientService.getAllClients({ limit: 500, page: 1 })
+        if (!cancelled) setClients(res.data || [])
       } catch (e) {
         // No es fatal: el usuario puede capturar manualmente
-        if (!cancelled) setClients([]);
+        if (!cancelled) setClients([])
       } finally {
-        if (!cancelled) setLoadingClients(false);
+        if (!cancelled) setLoadingClients(false)
       }
-    })();
-    return () => { cancelled = true; };
-  }, [open, type]);
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, type])
 
   // Lista filtrada por la búsqueda del usuario.
   // IMPORTANTE: este useMemo DEBE ir antes de cualquier early return.
@@ -86,72 +88,69 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
   // modal, porque en el primer render (open=false) no se llama y en el
   // segundo (open=true) sí — React detecta la inconsistencia y desmonta.
   const filteredClients = useMemo(() => {
-    if (!clientSearch) return clients.slice(0, 100);
-    const q = clientSearch.toLowerCase();
+    if (!clientSearch) return clients.slice(0, 100)
+    const q = clientSearch.toLowerCase()
     return clients
-      .filter(c =>
-        (c.nombre || '').toLowerCase().includes(q) ||
-        (c.rfc || '').toLowerCase().includes(q)
+      .filter(
+        (c) => (c.nombre || '').toLowerCase().includes(q) || (c.rfc || '').toLowerCase().includes(q)
       )
-      .slice(0, 100);
-  }, [clients, clientSearch]);
+      .slice(0, 100)
+  }, [clients, clientSearch])
 
   // Helper: si hay cliente seleccionado, mostrar su info (no es un hook,
   // pero lo movemos arriba junto al useMemo por consistencia).
-  const selectedClient = form.clienteId
-    ? clients.find(c => c._id === form.clienteId)
-    : null;
+  const selectedClient = form.clienteId ? clients.find((c) => c._id === form.clienteId) : null
 
-  if (!open) return null;
+  if (!open) return null
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-  };
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
 
   // Cambia el cliente seleccionado: autollena nombre y RFC
   const handleClientPick = (e) => {
-    const value = e.target.value;
+    const value = e.target.value
     if (value === '__free__') {
-      setForm(prev => ({ ...prev, clienteId: '', contactName: '', contactRfc: '' }));
+      setForm((prev) => ({ ...prev, clienteId: '', contactName: '', contactRfc: '' }))
     } else if (value === '') {
-      setForm(prev => ({ ...prev, clienteId: '' }));
+      setForm((prev) => ({ ...prev, clienteId: '' }))
     } else {
-      const c = clients.find(x => x._id === value);
+      const c = clients.find((x) => x._id === value)
       if (c) {
-        setForm(prev => ({
+        setForm((prev) => ({
           ...prev,
           clienteId: c._id,
           contactName: c.nombre || '',
-          contactRfc: c.rfc || '',
-        }));
+          contactRfc: c.rfc || ''
+        }))
       }
     }
-  };
+  }
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
+    e.preventDefault()
+    setError(null)
 
     if (!form.contactName.trim()) {
-      setError('El nombre del contacto es obligatorio');
-      return;
+      setError('El nombre del contacto es obligatorio')
+      return
     }
     if (!form.concept.trim()) {
-      setError('El concepto es obligatorio');
-      return;
+      setError('El concepto es obligatorio')
+      return
     }
-    const amount = Number(form.amount);
+    const amount = Number(form.amount)
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError('El monto debe ser mayor a 0');
-      return;
+      setError('El monto debe ser mayor a 0')
+      return
     }
     if (!form.issueDate || !form.dueDate) {
-      setError('Las fechas son obligatorias');
-      return;
+      setError('Las fechas son obligatorias')
+      return
     }
 
-    setSaving(true);
+    setSaving(true)
     try {
       const payload = {
         type,
@@ -163,31 +162,48 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
         amount,
         issueDate: form.issueDate,
         dueDate: form.dueDate,
-        notes: form.notes.trim() || undefined,
-      };
-      await onSave(payload);
-      onClose();
+        notes: form.notes.trim() || undefined
+      }
+      await onSave(payload)
+      onClose()
     } catch (err) {
-      setError(err.message || 'Error al guardar');
+      setError(err.message || 'Error al guardar')
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const title = initial
-    ? (type === 'receivable' ? 'Editar Nota por Cobrar' : 'Editar Nota por Pagar')
-    : (type === 'receivable' ? 'Nueva Nota por Cobrar' : 'Nueva Nota por Pagar');
+    ? type === 'receivable'
+      ? 'Editar Nota por Cobrar'
+      : 'Editar Nota por Pagar'
+    : type === 'receivable'
+      ? 'Nueva Nota por Cobrar'
+      : 'Nueva Nota por Pagar'
 
   return (
     <div className="notes-modal-backdrop" onClick={onClose}>
       <div className="notes-modal" onClick={(e) => e.stopPropagation()}>
         <div className="notes-modal-header">
           <h3>{title}</h3>
-          <button type="button" className="notes-modal-close" onClick={onClose} aria-label="Cerrar">✕</button>
+          <button type="button" className="notes-modal-close" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
         </div>
 
         {error && (
-          <div style={{ background: 'linear-gradient(to right, #fee2e2, #fecaca)', color: '#991b1b', padding: '0.85rem 1rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '0.9rem', border: '1px solid #fca5a5', fontWeight: 500 }}>
+          <div
+            style={{
+              background: 'linear-gradient(to right, #fee2e2, #fecaca)',
+              color: '#991b1b',
+              padding: '0.85rem 1rem',
+              borderRadius: 8,
+              marginBottom: '1.25rem',
+              fontSize: '0.9rem',
+              border: '1px solid #fca5a5',
+              fontWeight: 500
+            }}
+          >
             ⚠️ {error}
           </div>
         )}
@@ -199,7 +215,9 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
               <div className="form-group">
                 <label>{initial ? 'Cliente' : 'Cliente (catálogo)'} </label>
                 {loadingClients ? (
-                  <div style={{ padding: '0.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                  <div
+                    style={{ padding: '0.5rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}
+                  >
                     Cargando clientes...
                   </div>
                 ) : clients.length > 0 ? (
@@ -215,9 +233,11 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                       value={form.clienteId || (initial ? '' : '__free__')}
                       onChange={handleClientPick}
                     >
-                      {!initial && <option value="__free__">— Texto libre (sin cliente del catálogo) —</option>}
+                      {!initial && (
+                        <option value="__free__">— Texto libre (sin cliente del catálogo) —</option>
+                      )}
                       {initial && !selectedClient && <option value="">— Sin cliente —</option>}
-                      {filteredClients.map(c => (
+                      {filteredClients.map((c) => (
                         <option key={c._id} value={c._id}>
                           {c.nombre} {c.rfc ? `(${c.rfc})` : ''}
                         </option>
@@ -225,7 +245,9 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                     </select>
                   </>
                 ) : (
-                  <div style={{ padding: '0.4rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
+                  <div
+                    style={{ padding: '0.4rem 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}
+                  >
                     Sin clientes en el catálogo. Captura los datos abajo.
                   </div>
                 )}
@@ -267,7 +289,11 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
                 name="reference"
                 value={form.reference}
                 onChange={handleChange}
-                placeholder={initial?.folio ? `Folio actual: ${initial.folio}` : 'FACT-123, orden de compra, etc.'}
+                placeholder={
+                  initial?.folio
+                    ? `Folio actual: ${initial.folio}`
+                    : 'FACT-123, orden de compra, etc.'
+                }
               />
               {initial?.folio && (
                 <div style={{ fontSize: '0.7rem', color: 'var(--gray-500)', marginTop: '0.2rem' }}>
@@ -344,11 +370,11 @@ export default function NoteModal({ open, onClose, onSave, initial, type }) {
               Cancelar
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Guardando...' : (initial ? 'Actualizar' : 'Crear')}
+              {saving ? 'Guardando...' : initial ? 'Actualizar' : 'Crear'}
             </button>
           </div>
         </form>
       </div>
     </div>
-  );
+  )
 }
