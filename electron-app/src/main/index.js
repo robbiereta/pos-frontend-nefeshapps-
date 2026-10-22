@@ -29,6 +29,20 @@ async function startBackend() {
     ? join(process.resourcesPath, 'nefapi-cfdis')
     : join(app.getAppPath(), 'src', 'main', 'nefapi-cfdis')
   const backendRequire = createRequire(join(backendDir, 'package.json'))
+  let expressPath
+  try {
+    expressPath = backendRequire.resolve('express')
+    console.info(`Backend Express resolved: ${expressPath}`)
+  } catch (error) {
+    const expectedPath = join(backendDir, 'node_modules', 'express')
+    const searchPaths = backendRequire.resolve.paths('express') || []
+    throw new Error(
+      `No se encontró Express en el backend empaquetado. Backend: ${backendDir}. ` +
+        `Ruta esperada: ${expectedPath}. Rutas examinadas: ${searchPaths.join(', ') || '(ninguna)'}. ` +
+        `Error original: ${error.message}`,
+      { cause: error }
+    )
+  }
   const { startServer, stopServer: closeBackend } = backendRequire('./server.js')
   stopBackend = closeBackend
   await startServer()
