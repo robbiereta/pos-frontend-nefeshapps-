@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: electron-app
+appId: com.Npos
+productName: Npos
 directories:
   buildResources: build
 files:
@@ -24,8 +24,14 @@ extraResources:
       - '!**/*.md'
       - '!**/*.xlsx'
       - '!**/test-*.js'
+  - from: src/main/nefapi-cfdis/node_modules
+    to: nefapi-cfdis/node_modules
+    filter:
+      - '**/*'
+      - '!**/.env'
+      - '!**/.env.*'
 win:
-  executableName: electron-app
+  executableName: Npos
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

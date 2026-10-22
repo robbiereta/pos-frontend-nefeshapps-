@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   uploadProductImages,
   deleteProductImage,
   setPrincipalImage,
-  getProductImageUrl
+  loadProductImageUrl
 } from '../services/productImageService'
 import { useToast } from './ui/Toast.jsx'
 import './ProductImageUpload.css'
@@ -20,8 +20,33 @@ export default function ProductImageUpload({ productId, imagenes = [], onChange 
   const [list, setList] = useState(imagenes)
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [imageUrls, setImageUrls] = useState({})
   const inputRef = useRef(null)
   const toast = useToast()
+
+  useEffect(() => {
+    let active = true
+    const objectUrls = []
+
+    Promise.all(
+      list.map(async (image) => {
+        try {
+          const url = await loadProductImageUrl(image.url)
+          if (url?.startsWith('blob:')) objectUrls.push(url)
+          return [image._id || image.url, url]
+        } catch {
+          return [image._id || image.url, null]
+        }
+      })
+    ).then((entries) => {
+      if (active) setImageUrls(Object.fromEntries(entries))
+    })
+
+    return () => {
+      active = false
+      objectUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [list])
 
   const sync = (next) => {
     setList(next)
@@ -116,7 +141,7 @@ export default function ProductImageUpload({ productId, imagenes = [], onChange 
               key={img._id || img.url}
               className={`piu-item ${img.principal ? 'is-principal' : ''}`}
             >
-              <img src={getProductImageUrl(img.url)} alt="" />
+              <img src={imageUrls[img._id || img.url] || undefined} alt="" />
               <div className="piu-actions">
                 {!img.principal && (
                   <button

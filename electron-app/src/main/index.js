@@ -1,88 +1,33 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join, resolve } from 'path'
+import { join } from 'path'
 import { createRequire } from 'node:module'
 import { mkdir, stat } from 'node:fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 let stopBackend
 
-async function ensureWritableDirectory(candidate, fallback, label) {
-  const candidatePath = resolve(candidate)
-  const fallbackPath = resolve(fallback)
-  let candidateInfo
-  let candidateError
-
-  try {
-    await mkdir(candidatePath, { recursive: true })
-    candidateInfo = await stat(candidatePath)
-  } catch (error) {
-    candidateError = error
-  }
-
-  if (candidateInfo?.isDirectory()) return candidatePath
-  if (candidatePath === fallbackPath) {
-    if (candidateError) throw candidateError
-    throw new Error(`${label} path exists but is not a directory: ${candidatePath}`)
-  }
-
-  console.warn(
-    `Invalid ${label} path (${candidatePath}); using ${fallbackPath}:`,
-    candidateError?.message || 'not a directory'
-  )
-  let fallbackInfo
-  try {
-    await mkdir(fallbackPath, { recursive: true })
-    fallbackInfo = await stat(fallbackPath)
-  } catch (error) {
-    console.error(
-      `Cannot prepare ${label} directory. Configured path: ${candidatePath}; fallback path: ${fallbackPath}`,
-      error
-    )
-    throw error
-  }
-
-  if (!fallbackInfo.isDirectory()) {
-    throw new Error(`${label} fallback path exists but is not a directory: ${fallbackPath}`)
-  }
-  return fallbackPath
-}
-
 async function startBackend() {
   process.env.NODE_ENV ||= app.isPackaged ? 'production' : 'development'
+
+  // Keep writable backend data outside the read-only app.asar/AppImage mount.
+  const runtimeDir = join(app.getPath('userData'), 'nefapi-cfdis')
+  const runtimePaths = {
+    PRODUCT_UPLOADS_DIR: join(runtimeDir, 'uploads'),
+    PDF_STORAGE_PATH: join(runtimeDir, 'storage', 'pdfs'),
+    COTIZACION_PDF_STORAGE_PATH: join(runtimeDir, 'storage', 'cotizaciones')
+  }
+  for (const [key, directory] of Object.entries(runtimePaths)) {
+    const target = process.env[key] || directory
+    await mkdir(target, { recursive: true })
+    if (!(await stat(target)).isDirectory()) {
+      throw new Error(`${key} debe apuntar a una carpeta: ${target}`)
+    }
+    process.env[key] = target
+  }
 
   const backendDir = app.isPackaged
     ? join(process.resourcesPath, 'nefapi-cfdis')
     : join(app.getAppPath(), 'src', 'main', 'nefapi-cfdis')
-  const userDataDir = join(app.getPath('userData'), 'nefapi-cfdis')
-  const uploadsDir = await ensureWritableDirectory(
-    process.env.PRODUCT_UPLOADS_DIR || join(userDataDir, 'uploads'),
-    join(userDataDir, 'uploads'),
-    'product uploads'
-  )
-  await ensureWritableDirectory(
-    join(uploadsDir, 'products'),
-    join(userDataDir, 'uploads', 'products'),
-    'product images'
-  )
-  process.env.PRODUCT_UPLOADS_DIR = uploadsDir
-  process.env.PDF_STORAGE_PATH = await ensureWritableDirectory(
-    process.env.PDF_STORAGE_PATH || join(userDataDir, 'pdfs'),
-    join(userDataDir, 'pdfs'),
-    'invoice PDFs'
-  )
-  process.env.COTIZACION_PDF_STORAGE_PATH = await ensureWritableDirectory(
-    process.env.COTIZACION_PDF_STORAGE_PATH || join(userDataDir, 'cotizaciones'),
-    join(userDataDir, 'cotizaciones'),
-    'quotation PDFs'
-  )
-
-  const backendInfo = await stat(backendDir).catch((error) => {
-    throw new Error(`Backend directory not found at ${backendDir}`, { cause: error })
-  })
-  if (!backendInfo.isDirectory()) {
-    throw new Error(`Backend path is not a directory: ${backendDir}`)
-  }
-
   const backendRequire = createRequire(join(backendDir, 'package.json'))
   const { startServer, stopServer: closeBackend } = backendRequire('./server.js')
   stopBackend = closeBackend
