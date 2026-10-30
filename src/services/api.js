@@ -102,6 +102,13 @@ export const invoiceService = {
       body: JSON.stringify(data),
     });
   },
+    generateGlobalAndStamp: async (data) => {
+    return request('/api/invoices/globalAndStamp', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   generateClient: async (data) => {
     return request('/api/invoices/client', {
       method: 'POST',

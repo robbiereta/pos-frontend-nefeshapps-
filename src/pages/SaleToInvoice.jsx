@@ -503,22 +503,7 @@ export default function SaleToInvoice() {
     return (
       <div style={{ padding: '2rem' }}>
         <div style={{ marginBottom: '1rem' }}>
-          <button
-            onClick={() => {
-              setStep('preview');
-              setResult(null);
-            }}
-            style={{
-              backgroundColor: 'var(--gray-500)',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            ← Volver a lista
-          </button>
+          
         </div>
 
         <div className="card">
@@ -562,21 +547,7 @@ export default function SaleToInvoice() {
             }}>
               <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Acciones</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <button
-                  onClick={() => window.print()}
-                  style={{
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                    fontWeight: '500'
-                  }}
-                >
-                  🖨️ Imprimir / Descargar
-                </button>
+               
                 <button
                   onClick={() => setShowInvoicePrint(true)}
                   style={{

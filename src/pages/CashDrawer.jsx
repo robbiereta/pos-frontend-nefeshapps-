@@ -213,7 +213,7 @@ export default function CashDrawer() {
         userId: currentUser?._id || currentUser?.id
       };
 
-      const response = await invoiceService.generateGlobal(invoiceData);
+      const response = await invoiceService.generateGlobalAndStamp(invoiceData);
       toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {
@@ -262,6 +262,7 @@ export default function CashDrawer() {
       };
 
       const response = await invoiceService.generateGlobal(invoiceData);
+      cl
       toast.success('Factura global generada exitosamente');
       navigate('/invoices');
     } catch (err) {

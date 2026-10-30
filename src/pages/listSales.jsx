@@ -233,7 +233,7 @@ const ListSales = () => {
                             onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
                             title="Facturar directamente"
                           >
-                            🚀
+                            Facturar 
                           </button>
                           <button
                             onClick={() => handleDelete(sale._id)}
